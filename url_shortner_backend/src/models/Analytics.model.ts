@@ -12,6 +12,8 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IAnalytics extends Document {
   shortId: string;
+  urlId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
   date: string; // YYYY-MM-DD format
 
   totalClicks: number;
@@ -27,6 +29,18 @@ const analyticsSchema = new Schema<IAnalytics>(
     shortId: {
       type: String,
       required: true,
+    },
+    urlId: {
+      type: Schema.Types.ObjectId,
+      ref: "Url",
+      required: true,
+      index: true,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
     date: {
       type: String,
@@ -60,6 +74,8 @@ const analyticsSchema = new Schema<IAnalytics>(
 
 // Compound index for efficient upserts: one document per shortId per day
 analyticsSchema.index({ shortId: 1, date: 1 }, { unique: true });
+// Index on userId for user-specific queries
+analyticsSchema.index({ userId: 1 });
 
 export const AnalyticsModel = mongoose.model<IAnalytics>(
   "Analytics",

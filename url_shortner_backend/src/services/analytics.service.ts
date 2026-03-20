@@ -136,11 +136,12 @@ export async function deleteAnalyticsKeys(
 ): Promise<void> {
     const redis = getRedisClient();
     const aKey = analyticsKey(shortId, date);
-    const uKey = uniqueKey(shortId, date);
+    // DO NOT DELETE uKey (HyperLogLog)!
+    // If we delete the uKey, we lose the uniqueness state for the day.
+    // It will be cleaned up naturally by its 48-hour TTL.
     const cKey = clicksKey(shortId, date);
 
     await redis.del(aKey);
-    await redis.del(uKey);
     await redis.del(cKey);
 }
 

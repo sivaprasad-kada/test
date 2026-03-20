@@ -1,5 +1,6 @@
 // this page is analyzed
 import { UrlModel } from "../models/Url.model.js";
+import { AnalyticsModel } from "../models/Analytics.model.js";
 import { getCachedUrl, setCachedUrl, invalidateCachedUrl } from "./cache.service.js";
 import { generateShortCode } from "../utils/generateShortCode.js";
 import { getRedisClient } from "../config/redis.js";
@@ -17,7 +18,7 @@ import { getRedisClient } from "../config/redis.js";
  * Create a new short URL mapping.
  * Returns the generated short code.
  */
-export async function createShortUrl(longUrl: string): Promise<string> {
+export async function createShortUrl(longUrl: string, userId: string): Promise<string> {
   const redis = getRedisClient();
   const testCounter = await redis.get("url_counter")
   console.log(testCounter)
@@ -26,6 +27,7 @@ export async function createShortUrl(longUrl: string): Promise<string> {
   await UrlModel.create({
     shortId,
     longUrl,
+    userId,
   });
 
   // Pre-warm cache so the first redirect is fast
@@ -66,15 +68,25 @@ export async function getLongUrl(shortId: string): Promise<string | null> {
   return urlDoc.longUrl;
 }
 
+// ─── Get User URLs ───────────────────────────────────
+
+export async function getUserUrls(userId: string) {
+  return await UrlModel.find({ userId }).sort({ createdAt: -1 });
+}
+
+export async function getAnalytics(shortId: string, userId: string) {
+  return await AnalyticsModel.find({ shortId, userId }).sort({ date: -1 });
+}
+
 // ─── Update ──────────────────────────────────────────
 
 /**
  * Update the long URL for an existing short code.
  * Invalidates cache to prevent stale redirects.
  */
-export async function updateUrl(shortId: string, newLongUrl: string): Promise<boolean> {
+export async function updateUrl(shortId: string, newLongUrl: string, userId: string): Promise<boolean> {
   const result = await UrlModel.findOneAndUpdate(
-    { shortId },
+    { shortId, userId },
     { longUrl: newLongUrl },
     { new: true }
   );
@@ -98,8 +110,8 @@ export async function updateUrl(shortId: string, newLongUrl: string): Promise<bo
  * Delete a URL mapping.
  * Invalidates cache so deleted URLs stop redirecting immediately.
  */
-export async function deleteUrl(shortId: string): Promise<boolean> {
-  const result = await UrlModel.findOneAndDelete({ shortId });
+export async function deleteUrl(shortId: string, userId: string): Promise<boolean> {
+  const result = await UrlModel.findOneAndDelete({ shortId, userId });
 
   if (!result) {
     return false;

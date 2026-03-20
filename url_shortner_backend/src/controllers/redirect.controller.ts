@@ -39,7 +39,11 @@ export const redirectUrl = async (req: Request, res: Response): Promise<void> =>
         }
 
         // ── Step 2: Redirect FIRST — ultra-low latency ─────
-        res.redirect(302, longUrl);
+        let redirectTarget = longUrl;
+        if (!/^https?:\/\//i.test(redirectTarget)) {
+            redirectTarget = `https://${redirectTarget}`;
+        }
+        res.redirect(302, redirectTarget);
 
         // ── Step 3: Enqueue analytics (fire-and-forget) ────
         // This runs AFTER the response is sent to the client.

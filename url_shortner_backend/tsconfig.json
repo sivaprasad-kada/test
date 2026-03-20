@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": "./src",
+    "rootDir": "url_shortner_backend/src",
     "outDir": "./dist",
 
     "strict": true,

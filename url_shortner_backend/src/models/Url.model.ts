@@ -10,6 +10,7 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface IUrl extends Document {
   shortId: string;
   longUrl: string;
+  userId: mongoose.Types.ObjectId;
   clicks: number;
   createdAt: Date;
   updatedAt: Date;
@@ -21,6 +22,12 @@ const urlSchema = new Schema<IUrl>(
       type: String,
       required: true,
       unique: true,
+      index: true,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
       index: true,
     },
     longUrl: {

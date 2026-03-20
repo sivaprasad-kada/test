@@ -5,6 +5,7 @@ import {
     deleteAnalyticsKeys,
 } from "../services/analytics.service.js";
 import { AnalyticsModel } from "../models/Analytics.model.js";
+import { UrlModel } from "../models/Url.model.js";
 
 /**
  * Aggregation Worker
@@ -89,7 +90,8 @@ export async function runAggregation(): Promise<void> {
             // even if the aggregator runs twice before keys are deleted.
             const updateOps: Record<string, any> = {
                 $inc: { totalClicks },
-                $set: { uniqueVisitors },
+                // Use $max so if Redis loses the uKey data due to restart, we don't overwrite MongoDB with a lower count.
+                $max: { uniqueVisitors },
             };
 
             // Build $inc paths for nested counters
@@ -102,6 +104,17 @@ export async function runAggregation(): Promise<void> {
             for (const [type, count] of Object.entries(devices)) {
                 updateOps.$inc[`devices.${type}`] = count;
             }
+
+            const urlDoc = await UrlModel.findOne({ shortId }).select("_id userId").lean();
+            if (!urlDoc) {
+                await deleteAnalyticsKeys(shortId, date);
+                continue;
+            }
+
+            updateOps.$setOnInsert = {
+                urlId: urlDoc._id,
+                userId: urlDoc.userId
+            };
 
             await AnalyticsModel.findOneAndUpdate(
                 { shortId, date },
