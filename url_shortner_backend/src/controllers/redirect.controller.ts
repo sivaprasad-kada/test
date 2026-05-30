@@ -19,6 +19,10 @@ import { lookupGeo } from "../utils/geo.util.js";
  * CRITICAL: The analytics job is enqueued AFTER res.redirect()
  * so the user gets their response before any analytics work begins.
  * We use fire-and-forget (.catch) so a queue failure never blocks redirect.
+ *
+ * Graceful Degradation:
+ *   - If Redis is down, getLongUrl falls back to MongoDB
+ *   - If BullMQ is down, redirect still works (analytics is skipped)
  */
 
 export const redirectUrl = async (req: Request, res: Response): Promise<void> => {
@@ -30,7 +34,7 @@ export const redirectUrl = async (req: Request, res: Response): Promise<void> =>
             return;
         }
 
-        // ── Step 1: Resolve URL (cache-aside pattern) ──────
+        // ── Step 1: Resolve URL (cache-aside with MongoDB fallback) ──────
         const longUrl = await getLongUrl(shortId);
 
         if (!longUrl) {
@@ -48,25 +52,30 @@ export const redirectUrl = async (req: Request, res: Response): Promise<void> =>
         // ── Step 3: Enqueue analytics (fire-and-forget) ────
         // This runs AFTER the response is sent to the client.
         // Even if the queue is down, the redirect still works.
-        const ip = extractIp(req);
-        const uaHeader = req.headers["user-agent"];
-        const uaString = Array.isArray(uaHeader) ? uaHeader[0] : uaHeader;
-        const { browser, device } = parseUserAgent(uaString);
-        const { country, city } = lookupGeo(ip);
+        try {
+            const ip = extractIp(req);
+            const uaHeader = req.headers["user-agent"];
+            const uaString = Array.isArray(uaHeader) ? uaHeader[0] : uaHeader;
+            const { browser, device } = parseUserAgent(uaString);
+            const { country, city } = lookupGeo(ip);
 
-        enqueueAnalyticsJob({
-            shortId,
-            ip,
-            country,
-            city,
-            browser,
-            device,
-            referrer: String(req.headers.referer || req.headers.referrer || "direct"),
-            timestamp: new Date().toISOString(),
-        }).catch((err) => {
-            // Log but never block — analytics is non-critical
-            console.error("[Redirect] Failed to enqueue analytics job:", err.message);
-        });
+            enqueueAnalyticsJob({
+                shortId,
+                ip,
+                country,
+                city,
+                browser,
+                device,
+                referrer: String(req.headers.referer || req.headers.referrer || "direct"),
+                timestamp: new Date().toISOString(),
+            }).catch((err) => {
+                // Log but never block — analytics is non-critical
+                console.error("[Redirect] Failed to enqueue analytics job:", err.message);
+            });
+        } catch (analyticsErr: any) {
+            // Analytics preparation failed — redirect already succeeded
+            console.error("[Redirect] Analytics prep error:", analyticsErr.message);
+        }
     } catch (error: any) {
         console.error("[Redirect] Error:", error.message);
 

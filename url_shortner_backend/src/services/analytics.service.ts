@@ -1,4 +1,4 @@
-import { getRedisClient } from "../config/redis.js";
+import { getRedisClient, safeRedisOp, isRedisReady } from "../config/redis.js";
 
 /**
  * Analytics Service
@@ -60,6 +60,11 @@ export interface AnalyticsData {
  * Uses PFADD for probabilistic unique visitor counting.
  */
 export async function recordAnalytics(data: AnalyticsData): Promise<void> {
+    if (!isRedisReady()) {
+        console.warn("[Analytics] Redis unavailable, skipping analytics recording");
+        return;
+    }
+
     const redis = getRedisClient();
     const date = data.timestamp.slice(0, 10); // YYYY-MM-DD
     const aKey = analyticsKey(data.shortId, date);
@@ -110,9 +115,11 @@ export async function getAnalyticsHash(
     shortId: string,
     date: string
 ): Promise<Record<string, string>> {
-    const redis = getRedisClient();
-    const aKey = analyticsKey(shortId, date);
-    return redis.hGetAll(aKey);
+    return safeRedisOp(
+        () => getRedisClient().hGetAll(analyticsKey(shortId, date)),
+        {},
+        "Analytics"
+    );
 }
 
 /**
@@ -122,9 +129,27 @@ export async function getUniqueVisitors(
     shortId: string,
     date: string
 ): Promise<number> {
-    const redis = getRedisClient();
-    const uKey = uniqueKey(shortId, date);
-    return redis.pfCount(uKey);
+    return safeRedisOp(
+        () => getRedisClient().pfCount(uniqueKey(shortId, date)),
+        0,
+        "Analytics"
+    );
+}
+
+/**
+ * Get live click count from the simple counter.
+ * Used to show real-time clicks before aggregation syncs to MongoDB.
+ */
+export async function getLiveClickCount(
+    shortId: string,
+    date: string
+): Promise<number> {
+    const val = await safeRedisOp(
+        () => getRedisClient().get(clicksKey(shortId, date)),
+        null,
+        "Analytics"
+    );
+    return val ? parseInt(val, 10) : 0;
 }
 
 /**
@@ -134,15 +159,21 @@ export async function deleteAnalyticsKeys(
     shortId: string,
     date: string
 ): Promise<void> {
-    const redis = getRedisClient();
-    const aKey = analyticsKey(shortId, date);
-    // DO NOT DELETE uKey (HyperLogLog)!
-    // If we delete the uKey, we lose the uniqueness state for the day.
-    // It will be cleaned up naturally by its 48-hour TTL.
-    const cKey = clicksKey(shortId, date);
+    if (!isRedisReady()) return;
 
-    await redis.del(aKey);
-    await redis.del(cKey);
+    try {
+        const redis = getRedisClient();
+        const aKey = analyticsKey(shortId, date);
+        // DO NOT DELETE uKey (HyperLogLog)!
+        // If we delete the uKey, we lose the uniqueness state for the day.
+        // It will be cleaned up naturally by its 48-hour TTL.
+        const cKey = clicksKey(shortId, date);
+
+        await redis.del(aKey);
+        await redis.del(cKey);
+    } catch (err: any) {
+        console.error("[Analytics] Failed to delete Redis keys:", err.message);
+    }
 }
 
 /**
@@ -153,13 +184,23 @@ export async function deleteAnalyticsKeys(
  * Returns an array of keys like: analytics:abc123:2026-03-15
  */
 export async function scanAnalyticsKeys(): Promise<string[]> {
-    const redis = getRedisClient();
-    const keys: string[] = [];
-
-    // Use SCAN to iterate without blocking Redis
-    for await (const key of redis.scanIterator({ MATCH: "analytics:*", COUNT: 100 })) {
-        keys.push(String(key));
+    if (!isRedisReady()) {
+        console.warn("[Analytics] Redis unavailable, cannot scan keys");
+        return [];
     }
 
-    return keys;
+    try {
+        const redis = getRedisClient();
+        const keys: string[] = [];
+
+        // Use SCAN to iterate without blocking Redis
+        for await (const key of redis.scanIterator({ MATCH: "analytics:*", COUNT: 100 })) {
+            keys.push(String(key));
+        }
+
+        return keys;
+    } catch (err: any) {
+        console.error("[Analytics] Failed to scan keys:", err.message);
+        return [];
+    }
 }

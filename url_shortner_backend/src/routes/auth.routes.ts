@@ -10,11 +10,13 @@ import {
   githubAuthCallback,
 } from "../controllers/auth.controller.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
+import { authLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { validate, loginSchema, registerSchema } from "../validators/index.js";
 
 const router = Router();
 
-router.post("/register", register);
-router.post("/login", login);
+router.post("/register", authLimiter, validate(registerSchema), register);
+router.post("/login", authLimiter, validate(loginSchema), login);
 router.post("/logout", requireAuth, logout);
 router.get("/me", requireAuth, getMe);
 

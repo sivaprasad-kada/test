@@ -1,4 +1,4 @@
-import { getRedisClient } from "../config/redis.js";
+import { getRedisClient, safeRedisOp, isRedisReady } from "../config/redis.js";
 import baseX from "base-x";
 
 /**
@@ -11,20 +11,36 @@ import baseX from "base-x";
  *
  * Redis key: url_counter
  * Encoding:  Base62 (0-9, a-z, A-Z) for URL-safe short codes
+ *
+ * Fallback: If Redis is unavailable, uses crypto.randomUUID()
+ * to generate a unique code (less aesthetically pleasing but functional).
  */
 
 const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const base62 = baseX(BASE62);
 
 export async function generateShortCode(length: number = 6): Promise<string> {
-  const redis = getRedisClient();
+  if (!isRedisReady()) {
+    // Fallback: use random UUID-based code when Redis is down
+    const { randomUUID } = await import("crypto");
+    return randomUUID().replace(/-/g, "").slice(0, length);
+  }
 
-  // Atomic counter increment — no race conditions
-  const count = await redis.incr("url_counter");
+  try {
+    const redis = getRedisClient();
 
-  // Encode the counter value as Base62
-  const shortCode = base62.encode(Buffer.from(count.toString()));
+    // Atomic counter increment — no race conditions
+    const count = await redis.incr("url_counter");
 
-  // Pad to desired length for consistent URL aesthetics
-  return shortCode.slice(0, length).padStart(length, "0");
+    // Encode the counter value as Base62
+    const shortCode = base62.encode(Buffer.from(count.toString()));
+
+    // Pad to desired length for consistent URL aesthetics
+    return shortCode.slice(0, length).padStart(length, "0");
+  } catch (err: any) {
+    // Fallback on any Redis error
+    console.error("[ShortCode] Redis error, using UUID fallback:", err.message);
+    const { randomUUID } = await import("crypto");
+    return randomUUID().replace(/-/g, "").slice(0, length);
+  }
 }

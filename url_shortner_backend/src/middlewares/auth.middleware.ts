@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { getRedisClient } from "../config/redis.js";
+import { getRedisClient, safeRedisOp, isRedisReady } from "../config/redis.js";
 import { SessionModel } from "../models/Session.model.js";
 
 declare global {
@@ -19,15 +19,23 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ error: "Unauthorized - No session ID found" });
     }
 
-    const redisClient = getRedisClient();
     const sessionKey = `session:${sessionId}`;
-    
-    // 1. Check Redis
-    const cachedSessionStr = await redisClient.get(sessionKey);
+
+    // 1. Try Redis first (graceful — returns null if Redis is down)
+    const cachedSessionStr = await safeRedisOp(
+      () => getRedisClient().get(sessionKey),
+      null,
+      "Auth"
+    );
+
     if (cachedSessionStr) {
-      const cachedSession = JSON.parse(cachedSessionStr);
-      req.user = { id: cachedSession.userId };
-      return next();
+      try {
+        const cachedSession = JSON.parse(cachedSessionStr);
+        req.user = { id: cachedSession.userId };
+        return next();
+      } catch {
+        // Invalid JSON in Redis — fall through to MongoDB
+      }
     }
 
     // 2. Fallback to MongoDB
@@ -42,12 +50,18 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ error: "Unauthorized - Session expired" });
     }
 
-    // 3. Repopulate Redis
+    // 3. Repopulate Redis (silently fails if Redis is down)
     const ttlSeconds = Math.max(1, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000));
-    await redisClient.set(sessionKey, JSON.stringify({
-      userId: session.userId.toString(),
-      expiresAt: session.expiresAt.toISOString(),
-    }), { EX: ttlSeconds });
+    await safeRedisOp(
+      async () => {
+        await getRedisClient().set(sessionKey, JSON.stringify({
+          userId: session.userId.toString(),
+          expiresAt: session.expiresAt.toISOString(),
+        }), { EX: ttlSeconds });
+      },
+      undefined,
+      "Auth"
+    );
 
     req.user = { id: session.userId.toString() };
     next();

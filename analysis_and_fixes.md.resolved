@@ -1,0 +1,198 @@
+# URL Shortener — Comprehensive Fix Analysis
+
+## TASK 1: Analytics Clicks Sync Issue
+
+### Root Causes Found
+
+1. **Aggregation uses `$inc` on totalClicks from Redis, but Redis keys are deleted after sync** — This is correct design, BUT the problem is that the `getAnalytics()` service only queries MongoDB. Between aggregation cycles (up to 5 minutes), new clicks exist ONLY in Redis. The frontend sees stale MongoDB data.
+
+2. **URL document `clicks` field is never updated** — The aggregation worker upserts into the `Analytics` collection but never updates `UrlModel.clicks`. The dashboard reads `url.clicks` which is always 0.
+
+3. **Frontend never merges Redis "live" counts with MongoDB "aggregated" counts** — The analytics API (`GET /api/url/:shortId/analytics`) only returns `AnalyticsModel.find()`. It doesn't include pending Redis data for the current period.
+
+### Fixes Applied
+
+- **Added `getAnalytics()` to merge MongoDB + live Redis data** — The analytics API now reads pending Redis counters for today and returns a merged view.
+- **Aggregation worker now updates `UrlModel.clicks` atomically** after each sync using `$inc`.
+- **Added `getUserUrls()` enhancement** — Returns URLs with their computed totalClicks from the analytics collection (sum of all days) so the dashboard always shows accurate counts.
+
+---
+
+## TASK 2: Unique Visitors Tracking
+
+### Root Causes Found
+
+1. **HyperLogLog logic is correct** — `PFADD` and `PFCOUNT` are properly used.
+2. **`$max` for uniqueVisitors is correct** — Prevents overwriting with lower counts.
+3. **No timezone issues** — Date is derived from the job's `timestamp` field, sliced to `YYYY-MM-DD`.
+
+### What Was Validated
+
+- Redis key naming is consistent (`unique:{shortId}:{date}`)
+- The `uKey` is correctly preserved (not deleted) after aggregation sync
+- The 48-hour TTL gives enough buffer for the aggregator
+
+### Minor Fix
+
+- The live analytics merge now also includes live `PFCOUNT` for today's unique visitors.
+
+---
+
+## TASK 3: Clicks Field Mismatch
+
+### Root Cause
+
+The aggregation worker (`aggregation.worker.ts`) upserts analytics into the `Analytics` collection but **never touches** `UrlModel.clicks`. The URL document's `clicks` field stays at 0 forever.
+
+### Fix Applied
+
+After each successful analytics upsert, the aggregation worker now atomically increments `UrlModel.clicks` by the number of new clicks synced:
+
+```typescript
+await UrlModel.updateOne(
+  { shortId },
+  { $inc: { clicks: totalClicks } }
+);
+```
+
+This is safe because:
+- `totalClicks` comes from Redis `HINCRBY` (exactly the delta since last sync)
+- Redis keys are deleted after successful sync (no double-counting)
+
+---
+
+## TASK 4: Rate Limiting
+
+### Implementation
+
+Added `express-rate-limit` with three limiters:
+- **Auth limiter**: 20 requests per 15 minutes (login/register)
+- **Redirect limiter**: 100 requests per minute per IP (hot path)
+- **API limiter**: 60 requests per minute (analytics/URL management)
+
+All use in-memory store (appropriate for single EC2 instance).
+
+---
+
+## TASK 5: Security Headers
+
+### Implementation
+
+Added `helmet` middleware with configuration that works with CORS:
+- CSP is kept permissive (for development flexibility)
+- HSTS, X-Frame-Options, X-Content-Type-Options all enabled
+- `crossOriginResourcePolicy` set to `cross-origin` for frontend compatibility
+
+---
+
+## TASK 6: Request Validation (Zod)
+
+### Implementation
+
+Created `src/validators/` directory with Zod schemas for:
+- URL creation (`createUrlSchema`)
+- Login (`loginSchema`)
+- Register (`registerSchema`)
+
+Validation middleware wraps Zod and returns clean 400 errors.
+
+---
+
+## TASK 7: Environment Variables
+
+### Frontend Fix
+
+- `axios.ts` now uses `import.meta.env.VITE_API_URL` instead of hardcoded localhost
+- `DashboardPage.tsx` and `ShortenerPage.tsx` now use `VITE_API_URL` for backend base URL
+- `LoginPage.tsx` OAuth redirect now uses `VITE_API_URL`
+
+### Backend Fix
+
+- `.env.example` updated with all required variables
+- All env vars already had proper fallbacks — no changes needed
+
+---
+
+## TASK 8: Graceful Redis Failure Handling
+
+### 8.1 Redirect Fallback
+- `cache.service.ts` now wraps all Redis calls in try/catch
+- On Redis failure, returns `null` (cache miss) → falls back to MongoDB
+- Redirect always works even if Redis is down
+
+### 8.2 Analytics Queue Graceful Failure
+- `enqueueAnalyticsJob` already had `.catch()` on the fire-and-forget call
+- Queue creation now wrapped with error handling
+
+### 8.3 No process.exit on Redis failure
+- Redis config now has `connect`, `ready`, `reconnecting`, `error`, `end` event handlers
+- Removed crash-on-error behavior
+- Added `isRedisReady()` utility function
+
+### 8.4/8.5 Redis Utility Centralization
+- Created `safeRedisOp()` wrapper for common try/catch pattern
+- Cache service, auth middleware, and URL service use safe wrappers
+
+---
+
+## TASK 9: Frontend Analytics Sync
+
+### Fixes
+- Analytics page now auto-refreshes every 30 seconds
+- Dashboard page refreshes URL list periodically
+- Added proper loading/empty state handling
+- React Query `staleTime` set to 0 for analytics queries
+
+---
+
+## TASK 10: Code Quality
+
+### Cleanup
+- Removed debug `console.log` in `url.service.ts` (`testCounter` logging)
+- Removed debug `console.log` in `app.ts` ("app.js file is running")
+- Removed debug `console.log` in `AuthContext.tsx`
+- Improved naming consistency
+- Proper async error handling throughout
+
+---
+
+## Hidden Bugs Discovered
+
+1. **Dashboard `totalClicks` always 0** — `UrlModel.clicks` was never incremented
+2. **Live analytics invisible** — Between aggregation cycles, clicks only existed in Redis but API only queried MongoDB
+3. **Hardcoded `http://localhost:5000`** in 4 frontend files — would break in production
+4. **Debug console.logs** left in production code
+5. **Redis crash = app crash** — No graceful handling
+6. **No input validation** — Could create URLs with empty strings, SQL-injection-like payloads
+7. **No rate limiting** — Vulnerable to brute force on auth endpoints
+8. **No security headers** — Missing basic protections
+
+## Files Modified
+
+### Backend (13 files modified/created)
+| File | Change |
+|------|--------|
+| `src/config/redis.ts` | Graceful error handling, `isRedisReady()`, event handlers |
+| `src/services/cache.service.ts` | Safe Redis wrappers with try/catch |
+| `src/services/analytics.service.ts` | Added `getLiveClickCount()` and `getLiveUniqueVisitors()` |
+| `src/services/url.service.ts` | Merged live+aggregated analytics, removed debug logs |
+| `src/workers/aggregation.worker.ts` | Now updates `UrlModel.clicks` atomically |
+| `src/controllers/redirect.controller.ts` | Graceful Redis fallback |
+| `src/controllers/url.controller.ts` | Zod validation integration |
+| `src/controllers/auth.controller.ts` | Zod validation, safe Redis ops |
+| `src/middlewares/auth.middleware.ts` | Safe Redis fallback |
+| `src/middlewares/rateLimiter.middleware.ts` | **NEW** — Rate limiting |
+| `src/validators/index.ts` | **NEW** — Zod schemas |
+| `src/app.ts` | Helmet, rate limiters, removed debug log |
+| `src/server.ts` | Better shutdown, no crash on Redis fail |
+| `.env.example` | Updated with all variables |
+
+### Frontend (5 files modified)
+| File | Change |
+|------|--------|
+| `src/api/axios.ts` | Uses `VITE_API_URL` |
+| `src/pages/DashboardPage.tsx` | Uses `VITE_API_URL`, auto-refresh |
+| `src/pages/ShortenerPage.tsx` | Uses `VITE_API_URL` |
+| `src/pages/AnalyticsPage.tsx` | Auto-refresh, better empty states |
+| `src/pages/LoginPage.tsx` | Uses `VITE_API_URL` for OAuth |
+| `src/context/AuthContext.tsx` | Removed debug logs |

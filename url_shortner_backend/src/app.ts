@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import urlRoutes from "./routes/url.routes.js";
 import redirectRoutes from "./routes/redirect.routes.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -14,8 +15,16 @@ import cookieParser from "cookie-parser";
  * LAST because it's a catch-all parameterized route. If registered
  * first, it would intercept /api/url and /health requests.
  */
-console.log("app.js file is running : just for learning purpose 😁")
+
 const app = express();
+
+// ─── Security Headers ────────────────────────────────
+// Helmet adds essential security headers (X-Content-Type-Options,
+// X-Frame-Options, HSTS, etc.) with minimal configuration.
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false, // Disabled for development flexibility
+}));
 
 // ─── Middleware ───────────────────────────────────────
 

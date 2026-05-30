@@ -19,7 +19,8 @@ import { UrlModel } from "../models/Url.model.js";
  *   2. For each key, read the HASH and HyperLogLog
  *   3. Parse counters into structured data
  *   4. Upsert into MongoDB (one document per shortId per day)
- *   5. Delete processed Redis keys
+ *   5. Update URL document totalClicks
+ *   6. Delete processed Redis keys
  *
  * This batch approach is far more efficient than writing to
  * MongoDB on every click.
@@ -85,12 +86,21 @@ export async function runAggregation(): Promise<void> {
                 }
             }
 
-            // Step 4: Upsert into MongoDB
-            // Using $inc for counters ensures idempotent-ish merging
+            // Step 4: Find the URL document (needed for urlId and userId)
+            const urlDoc = await UrlModel.findOne({ shortId }).select("_id userId").lean();
+            if (!urlDoc) {
+                // URL was deleted but analytics keys still exist — clean up
+                await deleteAnalyticsKeys(shortId, date);
+                continue;
+            }
+
+            // Step 5: Upsert analytics into MongoDB
+            // Using $inc for counters ensures safe merging
             // even if the aggregator runs twice before keys are deleted.
             const updateOps: Record<string, any> = {
                 $inc: { totalClicks },
-                // Use $max so if Redis loses the uKey data due to restart, we don't overwrite MongoDB with a lower count.
+                // Use $max so if Redis loses the uKey data due to restart,
+                // we don't overwrite MongoDB with a lower count.
                 $max: { uniqueVisitors },
             };
 
@@ -105,12 +115,6 @@ export async function runAggregation(): Promise<void> {
                 updateOps.$inc[`devices.${type}`] = count;
             }
 
-            const urlDoc = await UrlModel.findOne({ shortId }).select("_id userId").lean();
-            if (!urlDoc) {
-                await deleteAnalyticsKeys(shortId, date);
-                continue;
-            }
-
             updateOps.$setOnInsert = {
                 urlId: urlDoc._id,
                 userId: urlDoc.userId
@@ -122,7 +126,15 @@ export async function runAggregation(): Promise<void> {
                 { upsert: true, new: true }
             );
 
-            // Step 5: Delete Redis keys after successful sync
+            // Step 6: Update URL document's total clicks
+            // This keeps UrlModel.clicks in sync with actual total clicks.
+            // Uses $inc with the delta (totalClicks from this sync batch).
+            await UrlModel.updateOne(
+                { shortId },
+                { $inc: { clicks: totalClicks } }
+            );
+
+            // Step 7: Delete Redis keys after successful sync
             await deleteAnalyticsKeys(shortId, date);
 
             successCount++;

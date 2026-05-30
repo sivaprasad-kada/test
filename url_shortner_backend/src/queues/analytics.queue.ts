@@ -17,25 +17,36 @@ import { getBullMQConnection } from "../config/bullmq.js";
  * Job name:   "trackClick"
  */
 
-export const analyticsQueue = new Queue("analyticsQueue", {
-    connection: getBullMQConnection(),
-    defaultJobOptions: {
-        // Retry failed jobs with exponential backoff
-        attempts: 3,
-        backoff: {
-            type: "exponential",
-            delay: 1000, // 1s, 2s, 4s
-        },
-        // Remove completed jobs after 1 hour to save memory
-        removeOnComplete: {
-            age: 3600,
-        },
-        // Keep failed jobs for 24 hours for debugging
-        removeOnFail: {
-            age: 86400,
-        },
-    },
-});
+let analyticsQueue: Queue | null = null;
+
+function getAnalyticsQueue(): Queue {
+    if (!analyticsQueue) {
+        analyticsQueue = new Queue("analyticsQueue", {
+            connection: getBullMQConnection(),
+            defaultJobOptions: {
+                // Retry failed jobs with exponential backoff
+                attempts: 3,
+                backoff: {
+                    type: "exponential",
+                    delay: 1000, // 1s, 2s, 4s
+                },
+                // Remove completed jobs after 1 hour to save memory
+                removeOnComplete: {
+                    age: 3600,
+                },
+                // Keep failed jobs for 24 hours for debugging
+                removeOnFail: {
+                    age: 86400,
+                },
+            },
+        });
+
+        analyticsQueue.on("error", (err) => {
+            console.error("[Queue] Analytics queue error:", err.message);
+        });
+    }
+    return analyticsQueue;
+}
 
 /**
  * Analytics Job Data — the payload pushed to the queue.
@@ -54,7 +65,14 @@ export interface AnalyticsJobData {
 /**
  * Enqueue an analytics tracking job.
  * Called from the redirect controller.
+ * Gracefully handles queue failures — never throws.
  */
 export async function enqueueAnalyticsJob(data: AnalyticsJobData): Promise<void> {
-    await analyticsQueue.add("trackClick", data);
+    try {
+        const queue = getAnalyticsQueue();
+        await queue.add("trackClick", data);
+    } catch (err: any) {
+        console.error("[Queue] Failed to enqueue analytics job:", err.message);
+        // Silently fail — analytics is non-critical
+    }
 }

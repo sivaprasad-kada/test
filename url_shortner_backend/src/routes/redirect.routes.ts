@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { redirectUrl } from "../controllers/redirect.controller.js";
+import { redirectLimiter } from "../middlewares/rateLimiter.middleware.js";
 
 /**
  * Redirect Routes
@@ -12,6 +13,6 @@ import { redirectUrl } from "../controllers/redirect.controller.js";
 
 const router = Router();
 
-router.get("/:shortId", redirectUrl);
+router.get("/:shortId", redirectLimiter, redirectUrl);
 
 export default router;

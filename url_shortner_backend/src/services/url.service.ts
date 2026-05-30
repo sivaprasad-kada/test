@@ -1,9 +1,8 @@
-// this page is analyzed
 import { UrlModel } from "../models/Url.model.js";
 import { AnalyticsModel } from "../models/Analytics.model.js";
 import { getCachedUrl, setCachedUrl, invalidateCachedUrl } from "./cache.service.js";
 import { generateShortCode } from "../utils/generateShortCode.js";
-import { getRedisClient } from "../config/redis.js";
+import { getLiveClickCount, getUniqueVisitors, getTodayDate } from "./analytics.service.js";
 
 /**
  * URL Service
@@ -19,11 +18,8 @@ import { getRedisClient } from "../config/redis.js";
  * Returns the generated short code.
  */
 export async function createShortUrl(longUrl: string, userId: string): Promise<string> {
-  const redis = getRedisClient();
-  const testCounter = await redis.get("url_counter")
-  console.log(testCounter)
   const shortId = await generateShortCode();
-  console.log(shortId)
+
   await UrlModel.create({
     shortId,
     longUrl,
@@ -49,20 +45,20 @@ export async function createShortUrl(longUrl: string, userId: string): Promise<s
  * Click counting happens asynchronously via the analytics worker.
  */
 export async function getLongUrl(shortId: string): Promise<string | null> {
-  // Step 1: Check cache
+  // Step 1: Check cache (returns null if Redis is down — graceful fallback)
   const cached = await getCachedUrl(shortId);
   if (cached) {
     return cached;
   }
 
-  // Step 2: Cache miss — query MongoDB
+  // Step 2: Cache miss (or Redis down) — query MongoDB
   const urlDoc = await UrlModel.findOne({ shortId }).select("longUrl").lean();
 
   if (!urlDoc || !urlDoc.longUrl) {
     return null;
   }
 
-  // Step 3: Populate cache for future requests
+  // Step 3: Populate cache for future requests (no-op if Redis is down)
   await setCachedUrl(shortId, urlDoc.longUrl);
 
   return urlDoc.longUrl;
@@ -71,11 +67,67 @@ export async function getLongUrl(shortId: string): Promise<string | null> {
 // ─── Get User URLs ───────────────────────────────────
 
 export async function getUserUrls(userId: string) {
-  return await UrlModel.find({ userId }).sort({ createdAt: -1 });
+  // Get URLs from MongoDB
+  const urls = await UrlModel.find({ userId }).sort({ createdAt: -1 }).lean();
+
+  // Enrich each URL with live Redis click count for today
+  // This ensures dashboard shows accurate counts even between aggregation cycles
+  const today = getTodayDate();
+
+  const enrichedUrls = await Promise.all(
+    urls.map(async (url) => {
+      // Get live clicks from Redis for today (not yet synced to MongoDB)
+      const liveClicks = await getLiveClickCount(url.shortId, today);
+      return {
+        ...url,
+        // Total clicks = MongoDB stored clicks + live Redis clicks for today
+        clicks: (url.clicks || 0) + liveClicks,
+      };
+    })
+  );
+
+  return enrichedUrls;
 }
 
+/**
+ * Get analytics for a specific shortId.
+ * Returns MongoDB aggregated data merged with live Redis data for today.
+ */
 export async function getAnalytics(shortId: string, userId: string) {
-  return await AnalyticsModel.find({ shortId, userId }).sort({ date: -1 });
+  // Get aggregated analytics from MongoDB
+  const mongoAnalytics = await AnalyticsModel.find({ shortId, userId })
+    .sort({ date: -1 })
+    .lean();
+
+  // Get live data from Redis for today
+  const today = getTodayDate();
+  const liveClicks = await getLiveClickCount(shortId, today);
+  const liveUnique = await getUniqueVisitors(shortId, today);
+
+  // If there are live clicks for today, merge them into the response
+  if (liveClicks > 0 || liveUnique > 0) {
+    const todayEntry = mongoAnalytics.find((a) => a.date === today);
+
+    if (todayEntry) {
+      // Merge live data on top of the aggregated data for today
+      todayEntry.totalClicks = (todayEntry.totalClicks || 0) + liveClicks;
+      todayEntry.uniqueVisitors = Math.max(todayEntry.uniqueVisitors || 0, liveUnique);
+    } else {
+      // No MongoDB entry for today yet — create a synthetic one from Redis
+      mongoAnalytics.unshift({
+        _id: `live-${today}` as any,
+        shortId,
+        date: today,
+        totalClicks: liveClicks,
+        uniqueVisitors: liveUnique,
+        countries: {},
+        browsers: {},
+        devices: {},
+      } as any);
+    }
+  }
+
+  return mongoAnalytics;
 }
 
 // ─── Update ──────────────────────────────────────────

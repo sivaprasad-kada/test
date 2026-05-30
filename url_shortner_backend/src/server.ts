@@ -15,8 +15,8 @@ import "./workers/analytics.worker.js";
  *
  * Startup order:
  *   1. Load environment variables (dotenv)
- *   2. Connect to MongoDB
- *   3. Connect to Redis
+ *   2. Connect to MongoDB (required — app exits if fails)
+ *   3. Connect to Redis (optional — app continues if fails)
  *   4. Start BullMQ analytics worker (via import)
  *   5. Start aggregation scheduler (node-cron)
  *   6. Start Express HTTP server
@@ -26,14 +26,14 @@ import "./workers/analytics.worker.js";
  *   - Stops accepting new requests
  */
 
-const PORT = parseInt(process.env.PORT || "3000", 10); //here 10 is radix(base) value
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
 async function bootstrap(): Promise<void> {
   try {
-    // Step 1: Connect to MongoDB
+    // Step 1: Connect to MongoDB (REQUIRED — source of truth)
     await connectMongo();
 
-    // Step 2: Connect to Redis
+    // Step 2: Connect to Redis (OPTIONAL — app degrades gracefully if down)
     await connectRedis();
 
     // Step 3: Start the aggregation scheduler (Redis → MongoDB sync)

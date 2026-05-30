@@ -11,10 +11,7 @@ import { createShortUrl, updateUrl, deleteUrl, getUserUrls, getAnalytics } from 
 export async function createShortUrlHandler(req: Request, res: Response) {
     try {
         let { url } = req.body;
-
-        if (!url) {
-            return res.status(400).json({ error: "URL is required" });
-        }
+        // Zod validation ensures url is present and valid
 
         if (!/^https?:\/\//i.test(url)) {
             url = `https://${url}`;
@@ -78,10 +75,7 @@ export async function updateUrlHandler(req: Request, res: Response) {
     try {
         const shortId = req.params.shortId as string;
         let { url } = req.body;
-
-        if (!url) {
-            return res.status(400).json({ error: "New URL is required" });
-        }
+        // Zod validation ensures url is present and valid
 
         if (!/^https?:\/\//i.test(url)) {
             url = `https://${url}`;

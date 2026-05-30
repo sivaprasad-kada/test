@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { UserModel } from "../models/User.model.js";
 import { SessionModel } from "../models/Session.model.js";
-import { getRedisClient } from "../config/redis.js";
+import { getRedisClient, safeRedisOp } from "../config/redis.js";
 
 const SESSION_DURATION_DAYS = 7;
 const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
@@ -14,19 +14,25 @@ const createSession = async (res: Response, userId: string) => {
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
   const ttlSeconds = Math.floor(SESSION_DURATION_MS / 1000);
 
-  // 1. Save to MongoDB
+  // 1. Save to MongoDB (source of truth)
   await SessionModel.create({
     sessionId,
     userId,
     expiresAt,
   });
 
-  // 2. Save to Redis
-  const redisClient = getRedisClient();
-  await redisClient.set(`session:${sessionId}`, JSON.stringify({
-    userId,
-    expiresAt: expiresAt.toISOString(),
-  }), { EX: ttlSeconds });
+  // 2. Save to Redis (cache — silently fails if Redis is down)
+  await safeRedisOp(
+    async () => {
+      const redisClient = getRedisClient();
+      await redisClient.set(`session:${sessionId}`, JSON.stringify({
+        userId,
+        expiresAt: expiresAt.toISOString(),
+      }), { EX: ttlSeconds });
+    },
+    undefined,
+    "Auth Session"
+  );
 
   // 3. Set cookie
   res.cookie("sessionId", sessionId, {
@@ -40,9 +46,7 @@ const createSession = async (res: Response, userId: string) => {
 export const register = async (req: Request, res: Response): Promise<any> => {
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+    // Zod validation handles field presence checks upstream
 
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
@@ -68,9 +72,7 @@ export const register = async (req: Request, res: Response): Promise<any> => {
 export const login = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+    // Zod validation handles field presence checks upstream
 
     const user = await UserModel.findOne({ email });
     if (!user || user.provider !== "local" || !user.password) {
@@ -95,8 +97,11 @@ export const logout = async (req: Request, res: Response): Promise<any> => {
     const sessionId = req.cookies?.sessionId;
     if (sessionId) {
       await SessionModel.deleteOne({ sessionId });
-      const redisClient = getRedisClient();
-      await redisClient.del(`session:${sessionId}`);
+      await safeRedisOp(
+        async () => { await getRedisClient().del(`session:${sessionId}`); },
+        undefined,
+        "Auth Logout"
+      );
     }
     res.clearCookie("sessionId");
     res.json({ message: "Logged out successfully" });
