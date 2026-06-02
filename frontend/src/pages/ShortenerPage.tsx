@@ -35,8 +35,9 @@ const ShortenerPage = () => {
     try {
       const res = await api.get("/url");
       setUrls(res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) navigate("/login");
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { status?: number } };
+      if (axiosError.response?.status === 401) navigate("/login");
     } finally {
       setLoading(false);
     }
@@ -57,11 +58,12 @@ const ShortenerPage = () => {
       setUrl("");
       // refresh the list
       fetchUrls();
-    } catch (err: any) {
-      const errorData = err.response?.data;
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string; details?: Array<{ message: string }> } } };
+      const errorData = axiosError.response?.data;
       // Handle Zod validation errors
       if (errorData?.details && Array.isArray(errorData.details)) {
-        setCreateError(errorData.details.map((d: any) => d.message).join(". "));
+        setCreateError(errorData.details.map((d) => d.message).join(". "));
       } else {
         setCreateError(errorData?.error || "Failed to create short URL.");
       }
@@ -96,7 +98,7 @@ const ShortenerPage = () => {
   const recentUrls = urls.slice(0, 10);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-background">
       <DashboardSidebar />
 
       <main className="flex-1 p-6 md:p-10 overflow-auto">

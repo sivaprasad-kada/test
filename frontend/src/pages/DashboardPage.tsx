@@ -38,10 +38,11 @@ const DashboardPage = () => {
       const res = await api.get("/url");
       setUrls(res.data);
       setError("");
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { status?: number } };
+      if (axiosError.response?.status === 401) {
         navigate("/login");
-      } else if (!isRefresh) {
+      } else {
         setError("Failed to fetch URLs.");
       }
     } finally {
@@ -97,7 +98,7 @@ const DashboardPage = () => {
   const firstName = user?.name?.split(" ")[0] || "User";
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-background">
       <DashboardSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-auto">
         <div className="flex items-center justify-between mb-8">
@@ -106,7 +107,13 @@ const DashboardPage = () => {
             <p className="text-muted-foreground mt-1">Here's what's happening with your links today.</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" size="sm" onClick={() => fetchUrls(true)} className="gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => fetchUrls(true)} 
+              className="gap-2"
+              disabled={loading || refreshing}
+            >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
             </Button>
             <Button onClick={() => navigate("/shortener")}>+ Create New Link</Button>

@@ -34,7 +34,7 @@ const plans = [
 
 const PricingSection = () => {
   return (
-    <section className="py-24 px-6">
+    <section className="py-10 md:py-14 lg:py-20 px-6">
       <div className="max-w-5xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-4">Plans for teams of all sizes</h2>
         <p className="text-muted-foreground mb-16">Simple, transparent pricing to help you grow your brand's reach.</p>

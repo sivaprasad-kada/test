@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, Navigate, useSearchParams } from "react-router-dom";
 import { Link2, Eye, EyeOff, Zap, Shield, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -9,8 +9,13 @@ import { FaGithub } from "react-icons/fa";
 const LoginPage = () => {
   const { user, login, register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(searchParams.get("signup") !== "true");
+
+  useEffect(() => {
+    setIsLogin(searchParams.get("signup") !== "true");
+  }, [searchParams]);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -39,10 +44,11 @@ const LoginPage = () => {
     try {
       await login(loginEmail, loginPassword);
       navigate("/dashboard");
-    } catch (err: any) {
-      const errorData = err.response?.data;
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string; details?: Array<{ message: string }> } } };
+      const errorData = axiosError.response?.data;
       if (errorData?.details && Array.isArray(errorData.details)) {
-        setLoginError(errorData.details.map((d: any) => d.message).join(". "));
+        setLoginError(errorData.details.map((d) => d.message).join(". "));
       } else {
         setLoginError(errorData?.error || "Login failed. Please try again.");
       }
@@ -62,10 +68,11 @@ const LoginPage = () => {
     try {
       await register(regName, regEmail, regPassword);
       navigate("/dashboard");
-    } catch (err: any) {
-      const errorData = err.response?.data;
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string; details?: Array<{ message: string }> } } };
+      const errorData = axiosError.response?.data;
       if (errorData?.details && Array.isArray(errorData.details)) {
-        setRegError(errorData.details.map((d: any) => d.message).join(". "));
+        setRegError(errorData.details.map((d) => d.message).join(". "));
       } else {
         setRegError(errorData?.error || "Registration failed. Please try again.");
       }

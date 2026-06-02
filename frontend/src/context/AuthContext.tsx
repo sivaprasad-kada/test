@@ -36,10 +36,24 @@
     };
 
     useEffect(() => {
+      const interceptor = api.interceptors.response.use(
+        (response) => response,
+        (error) => {
+          if (error.response?.status === 401) {
+            setUser(null);
+          }
+          return Promise.reject(error);
+        }
+      );
+
       (async () => {
         await refreshUser();
         setLoading(false);
       })();
+
+      return () => {
+        api.interceptors.response.eject(interceptor);
+      };
     }, []);
 
     const login = async (email: string, password: string) => {
@@ -55,8 +69,13 @@
     };
 
     const logout = async () => {
-      await api.post("/auth/logout");
-      setUser(null);
+      try {
+        await api.post("/auth/logout");
+      } catch {
+        // ignore
+      } finally {
+        setUser(null);
+      }
     };
 
     return (

@@ -1,47 +1,65 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateShortCode = generateShortCode;
 const redis_js_1 = require("../config/redis.js");
-const base_x_1 = __importDefault(require("base-x"));
+const shortCode_js_1 = require("../config/shortCode.js");
+const base62_js_1 = require("./base62.js");
+const crypto_1 = require("crypto");
 /**
  * Short Code Generator
  * ────────────────────
- * Generates unique short codes using Redis INCR + Base62 encoding.
+ * Generates unique, non-sequential short codes for URLs using:
+ * 1. Redis INCR (Atomic counter) as the source of truth to ensure zero collisions.
+ * 2. Bitwise XOR with a secret key (SHORT_CODE_SECRET) to obfuscate sequence.
+ * 3. Base62 Encoding to turn the obfuscated integer value into a short URL-safe string.
  *
- * Uses Redis INCR for the atomic counter instead of MongoDB,
- * which is faster and avoids write contention on the database.
+ * Why Redis INCR is used:
+ * - Redis INCR is an O(1) atomic operation. It guarantees unique, non-overlapping IDs
+ *   under high concurrency without database lock contention or separate transactions.
  *
- * Redis key: url_counter
- * Encoding:  Base62 (0-9, a-z, A-Z) for URL-safe short codes
+ * Why XOR Obfuscation is used:
+ * - Prevents URL enumeration (so competitors cannot guess previous/next links or count active links).
+ * - Obfuscates sequential IDs, giving them a professional, random appearance.
  *
- * Fallback: If Redis is unavailable, uses crypto.randomUUID()
- * to generate a unique code (less aesthetically pleasing but functional).
+ * Why Base62 Encoding is used:
+ * - Turn large numeric IDs into short, readable strings using characters `0-9`, `a-z`, `A-Z`.
+ * - It is URL-safe and compact.
+ *
+ * Fallback Strategy:
+ * - If Redis is unavailable, it generates 6 random bytes (`crypto.randomBytes(6)`),
+ *   converts them to a 48-bit unsigned integer, and encodes it into Base62.
+ *   This ensures no UUID slicing and maintains URL safety, randomness, and collision resistance.
  */
-const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const base62 = (0, base_x_1.default)(BASE62);
-async function generateShortCode(length = 6) {
+async function generateShortCode() {
     if (!(0, redis_js_1.isRedisReady)()) {
-        // Fallback: use random UUID-based code when Redis is down
-        const { randomUUID } = await import("crypto");
-        return randomUUID().replace(/-/g, "").slice(0, length);
+        return generateFallbackCode();
     }
     try {
         const redis = (0, redis_js_1.getRedisClient)();
-        // Atomic counter increment — no race conditions
-        const count = await redis.incr("url_counter");
-        // Encode the counter value as Base62
-        const shortCode = base62.encode(Buffer.from(count.toString()));
-        // Pad to desired length for consistent URL aesthetics
-        return shortCode.slice(0, length).padStart(length, "0");
+        // 1. Redis Atomic Counter increment
+        const counter = await redis.incr("url_counter");
+        // 2. Secret-Based Obfuscation using bitwise XOR, cast to unsigned 32-bit integer
+        const obfuscatedId = (counter ^ shortCode_js_1.SHORT_CODE_SECRET) >>> 0;
+        // 3. Base62 Encode
+        return (0, base62_js_1.encodeBase62)(obfuscatedId);
     }
     catch (err) {
-        // Fallback on any Redis error
-        console.error("[ShortCode] Redis error, using UUID fallback:", err.message);
-        const { randomUUID } = await import("crypto");
-        return randomUUID().replace(/-/g, "").slice(0, length);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error("[ShortCode] Redis error, using crypto fallback:", errMsg);
+        return generateFallbackCode();
     }
+}
+/**
+ * Generates a fallback code when Redis is unavailable.
+ * Generates 6 cryptographically secure random bytes, converts them
+ * to a 48-bit integer, and encodes it into Base62.
+ */
+function generateFallbackCode() {
+    const bytes = (0, crypto_1.randomBytes)(6);
+    let num = 0;
+    for (let i = 0; i < bytes.length; i++) {
+        num = num * 256 + bytes[i];
+    }
+    return (0, base62_js_1.encodeBase62)(num);
 }
 //# sourceMappingURL=generateShortCode.js.map

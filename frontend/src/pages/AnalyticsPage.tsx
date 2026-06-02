@@ -42,8 +42,9 @@ const AnalyticsPage = () => {
     try {
       const res = await api.get("/url");
       setUrls(res.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) navigate("/login");
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { status?: number } };
+      if (axiosError.response?.status === 401) navigate("/login");
     }
   }, [navigate]);
 
@@ -62,8 +63,9 @@ const AnalyticsPage = () => {
       setUrls(urlsRes.data);
       const found = urlsRes.data.find((u: UrlItem) => u.shortId === id);
       setUrlInfo(found || null);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { status?: number } };
+      if (axiosError.response?.status === 401) {
         navigate("/login");
       } else if (!isRefresh) {
         setError("Failed to load analytics data.");
@@ -149,7 +151,7 @@ const AnalyticsPage = () => {
   // If no shortId provided, show URL selector
   if (!shortId) {
     return (
-      <div className="flex min-h-screen bg-background">
+      <div className="flex flex-col lg:flex-row min-h-screen bg-background">
         <DashboardSidebar />
         <main className="flex-1 p-6 md:p-10 overflow-auto">
           <div className="flex items-center justify-between mb-2">
@@ -194,7 +196,7 @@ const AnalyticsPage = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-background">
       <DashboardSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-auto">
         <div className="mb-4">
