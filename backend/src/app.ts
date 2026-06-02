@@ -32,8 +32,13 @@ app.use(helmet({
 app.set("trust proxy", true);
 
 // CORS — allow frontend to send cookies cross-origin
+const rawFrontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+const sanitizedFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:8080",
+  rawFrontendUrl,
+  sanitizedFrontendUrl,
+  "https://shortly.sivaprasadkada.tech",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   "http://localhost:5173",
