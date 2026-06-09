@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
+import { baseURL as apiBase } from "@/api/axios";
 
 const LoginPage = () => {
   const { user, login, register } = useAuth();
@@ -31,8 +32,7 @@ const LoginPage = () => {
   const [regError, setRegError] = useState("");
   const [regLoading, setRegLoading] = useState(false);
 
-  // Backend base URL for OAuth
-  const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 
   // If already logged in, redirect to dashboard
   if (user) return <Navigate to="/dashboard" replace />;

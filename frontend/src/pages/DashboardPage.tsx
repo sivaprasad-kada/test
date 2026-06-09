@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import api from "@/api/axios";
+import api, { backendBase } from "@/api/axios";
 
 interface UrlItem {
   _id: string;
@@ -26,9 +26,7 @@ const DashboardPage = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const backendBase = import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace(/\/api$/, "")
-    : "http://localhost:5000";
+
 
   const fetchUrls = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link2, Copy, Check, Loader2, Trash2, ExternalLink, QrCode, Lock, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import api from "@/api/axios";
+import api, { backendBase } from "@/api/axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -47,9 +47,7 @@ const ShortenerPage = () => {
 
   const isPro = user?.plan === "PRO";
 
-  const backendBase = import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace(/\/api$/, "")
-    : "http://localhost:5000";
+
 
   const fetchUrls = async () => {
     try {
