@@ -8,7 +8,9 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const crypto_1 = __importDefault(require("crypto"));
 const User_model_js_1 = require("../models/User.model.js");
 const Session_model_js_1 = require("../models/Session.model.js");
+const Url_model_js_1 = require("../models/Url.model.js");
 const redis_js_1 = require("../config/redis.js");
+const env_js_1 = require("../config/env.js");
 const SESSION_DURATION_DAYS = 7;
 const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 // Helper to create session
@@ -109,7 +111,22 @@ const getMe = async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        res.json({ user });
+        // Dynamic redirect quota reset check
+        const now = new Date();
+        if (!user.redirectQuotaResetDate || now >= user.redirectQuotaResetDate) {
+            user.monthlyRedirectCount = 0;
+            user.redirectQuotaResetDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+            await user.save();
+        }
+        const linkCount = await Url_model_js_1.UrlModel.countDocuments({ userId: user._id });
+        res.json({
+            user,
+            limits: {
+                maxLinks: user.plan === "PRO" ? env_js_1.env.PRO_MAX_LINKS : env_js_1.env.FREE_MAX_LINKS,
+                maxRedirects: user.plan === "PRO" ? env_js_1.env.PRO_MAX_REDIRECTS : env_js_1.env.FREE_MAX_REDIRECTS,
+                linkCount,
+            }
+        });
     }
     catch (error) {
         console.error("[Auth] GetMe error", error);
@@ -119,7 +136,7 @@ const getMe = async (req, res) => {
 exports.getMe = getMe;
 const googleAuth = async (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID || "dummy_google_client_id";
-    const redirectUri = process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback";
+    const redirectUri = env_js_1.env.GOOGLE_CALLBACK_URL;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile`;
     res.redirect(authUrl);
 };
@@ -132,7 +149,7 @@ const googleAuthCallback = async (req, res) => {
         }
         const clientId = process.env.GOOGLE_CLIENT_ID;
         const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-        const redirectUri = process.env.GOOGLE_CALLBACK_URL;
+        const redirectUri = env_js_1.env.GOOGLE_CALLBACK_URL;
         // 1. Exchange code for token
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",
@@ -179,7 +196,7 @@ const googleAuthCallback = async (req, res) => {
             await user.save();
         }
         await createSession(res, user._id.toString());
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+        const frontendUrl = env_js_1.env.FRONTEND_URL;
         res.redirect(`${frontendUrl}/dashboard`);
     }
     catch (error) {
@@ -190,7 +207,7 @@ const googleAuthCallback = async (req, res) => {
 exports.googleAuthCallback = googleAuthCallback;
 const githubAuth = async (req, res) => {
     const clientId = process.env.GITHUB_CLIENT_ID || "dummy_github_client_id";
-    const redirectUri = process.env.GITHUB_CALLBACK_URL || "http://localhost:5000/api/auth/github/callback";
+    const redirectUri = env_js_1.env.GITHUB_CALLBACK_URL;
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user`;
     res.redirect(authUrl);
 };
@@ -271,7 +288,7 @@ const githubAuthCallback = async (req, res) => {
             await user.save();
         }
         await createSession(res, user._id.toString());
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+        const frontendUrl = env_js_1.env.FRONTEND_URL;
         res.redirect(`${frontendUrl}/dashboard`);
     }
     catch (error) {

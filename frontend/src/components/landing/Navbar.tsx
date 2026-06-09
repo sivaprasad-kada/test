@@ -28,6 +28,18 @@ const Navbar = () => {
     }
   };
 
+  const scrollToPricing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // If we are on the homepage, scroll smoothly
+    const element = document.getElementById("pricing");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // If we are on dashboard or login, go to index page with pricing anchor
+      navigate("/#pricing");
+    }
+  };
+
   return (
     <nav className="flex items-center justify-between px-6 md:px-8 h-16 max-w-7xl mx-auto">
       <Link to="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
@@ -40,11 +52,11 @@ const Navbar = () => {
       {/* Desktop Menu */}
       <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
         <Link to="/" className="hover:text-foreground transition-colors">Features</Link>
-        <Link to="/" className="hover:text-foreground transition-colors">Pricing</Link>
+        <a href="#pricing" onClick={scrollToPricing} className="hover:text-foreground transition-colors">Pricing</a>
         <Link to="/" className="hover:text-foreground transition-colors">Analytics</Link>
         <Link to="/" className="hover:text-foreground transition-colors">Enterprise</Link>
       </div>
-
+ 
       <div className="hidden md:flex items-center gap-3">
         <Button
           variant="ghost"
@@ -55,9 +67,16 @@ const Navbar = () => {
         >
           {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
         </Button>
-
+ 
         {user ? (
-          <Button size="sm" onClick={() => handleAuthNavigation("dashboard")}>Dashboard</Button>
+          <div className="flex items-center gap-2">
+            {user.plan !== "PRO" && (
+              <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/billing")} className="border-primary text-primary hover:bg-primary/10">
+                Upgrade
+              </Button>
+            )}
+            <Button size="sm" onClick={() => handleAuthNavigation("dashboard")}>Dashboard</Button>
+          </div>
         ) : (
           <>
             <Button variant="ghost" size="sm" onClick={() => handleAuthNavigation("login")}>Log in</Button>
@@ -65,7 +84,7 @@ const Navbar = () => {
           </>
         )}
       </div>
-
+ 
       {/* Mobile Menu */}
       <div className="md:hidden flex items-center gap-1">
         <Button
@@ -77,7 +96,7 @@ const Navbar = () => {
         >
           {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
         </Button>
-
+ 
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -93,7 +112,7 @@ const Navbar = () => {
                   <Link to="/" className="text-base font-medium hover:text-primary transition-colors py-1.5">Features</Link>
                 </SheetClose>
                 <SheetClose asChild>
-                  <Link to="/" className="text-base font-medium hover:text-primary transition-colors py-1.5">Pricing</Link>
+                  <a href="#pricing" onClick={scrollToPricing} className="text-base font-medium hover:text-primary transition-colors py-1.5">Pricing</a>
                 </SheetClose>
                 <SheetClose asChild>
                   <Link to="/" className="text-base font-medium hover:text-primary transition-colors py-1.5">Analytics</Link>
@@ -102,19 +121,32 @@ const Navbar = () => {
                   <Link to="/" className="text-base font-medium hover:text-primary transition-colors py-1.5">Enterprise</Link>
                 </SheetClose>
               </div>
-
+ 
               <div className="h-px bg-border my-2" />
-
+ 
               <div className="flex flex-col gap-3">
                 {user ? (
-                  <SheetClose asChild>
-                    <Button 
-                      className="w-full font-semibold"
-                      onClick={() => handleAuthNavigation("dashboard")}
-                    >
-                      Dashboard
-                    </Button>
-                  </SheetClose>
+                  <div className="flex flex-col gap-2">
+                    {user.plan !== "PRO" && (
+                      <SheetClose asChild>
+                        <Button 
+                          variant="outline"
+                          className="w-full font-semibold border-primary text-primary hover:bg-primary/10"
+                          onClick={() => navigate("/dashboard/billing")}
+                        >
+                          Upgrade to Pro
+                        </Button>
+                      </SheetClose>
+                    )}
+                    <SheetClose asChild>
+                      <Button 
+                        className="w-full font-semibold"
+                        onClick={() => handleAuthNavigation("dashboard")}
+                      >
+                        Dashboard
+                      </Button>
+                    </SheetClose>
+                  </div>
                 ) : (
                   <>
                     <SheetClose asChild>

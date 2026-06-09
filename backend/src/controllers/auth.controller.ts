@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { UserModel } from "../models/User.model.js";
 import { SessionModel } from "../models/Session.model.js";
+import { UrlModel } from "../models/Url.model.js";
 import { getRedisClient, safeRedisOp } from "../config/redis.js";
+import { env } from "../config/env.js";
 
 const SESSION_DURATION_DAYS = 7;
 const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
@@ -123,7 +125,24 @@ export const getMe = async (req: Request, res: Response): Promise<any> => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({ user });
+    // Dynamic redirect quota reset check
+    const now = new Date();
+    if (!user.redirectQuotaResetDate || now >= user.redirectQuotaResetDate) {
+      user.monthlyRedirectCount = 0;
+      user.redirectQuotaResetDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      await user.save();
+    }
+
+    const linkCount = await UrlModel.countDocuments({ userId: user._id });
+
+    res.json({
+      user,
+      limits: {
+        maxLinks: user.plan === "PRO" ? env.PRO_MAX_LINKS : env.FREE_MAX_LINKS,
+        maxRedirects: user.plan === "PRO" ? env.PRO_MAX_REDIRECTS : env.FREE_MAX_REDIRECTS,
+        linkCount,
+      }
+    });
   } catch (error) {
     console.error("[Auth] GetMe error", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -132,7 +151,7 @@ export const getMe = async (req: Request, res: Response): Promise<any> => {
 
 export const googleAuth = async (req: Request, res: Response): Promise<any> => {
   const clientId = process.env.GOOGLE_CLIENT_ID || "dummy_google_client_id";
-  const redirectUri = process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback";
+  const redirectUri = env.GOOGLE_CALLBACK_URL;
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile`;
   res.redirect(authUrl);
 };
@@ -146,7 +165,7 @@ export const googleAuthCallback = async (req: Request, res: Response): Promise<a
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_CALLBACK_URL;
+    const redirectUri = env.GOOGLE_CALLBACK_URL;
 
     // 1. Exchange code for token
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -200,7 +219,7 @@ export const googleAuthCallback = async (req: Request, res: Response): Promise<a
     }
 
     await createSession(res, user._id.toString());
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+    const frontendUrl = env.FRONTEND_URL;
     res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error("[Auth] Google OAuth error", error);
@@ -210,7 +229,7 @@ export const googleAuthCallback = async (req: Request, res: Response): Promise<a
 
 export const githubAuth = async (req: Request, res: Response): Promise<any> => {
   const clientId = process.env.GITHUB_CLIENT_ID || "dummy_github_client_id";
-  const redirectUri = process.env.GITHUB_CALLBACK_URL || "http://localhost:5000/api/auth/github/callback";
+  const redirectUri = env.GITHUB_CALLBACK_URL;
   const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user`;
   res.redirect(authUrl);
 };
@@ -299,7 +318,7 @@ export const githubAuthCallback = async (req: Request, res: Response): Promise<a
     }
 
     await createSession(res, user._id.toString());
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+    const frontendUrl = env.FRONTEND_URL;
     res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error("[Auth] GitHub OAuth error", error);

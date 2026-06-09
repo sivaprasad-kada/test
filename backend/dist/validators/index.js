@@ -26,6 +26,13 @@ exports.createUrlSchema = zod_1.z.object({
             return false;
         }
     }, { message: "Invalid URL format" }),
+    customAlias: zod_1.z
+        .string()
+        .min(3, "Alias must be at least 3 characters")
+        .max(30, "Alias must be at most 30 characters")
+        .regex(/^[a-zA-Z0-9_-]+$/, "Alias must contain only alphanumeric characters, hyphens or underscores")
+        .optional()
+        .or(zod_1.z.literal("")),
 });
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z

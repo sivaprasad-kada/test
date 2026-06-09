@@ -25,6 +25,8 @@ const geo_util_js_1 = require("../utils/geo.util.js");
  *   - If Redis is down, getLongUrl falls back to MongoDB
  *   - If BullMQ is down, redirect still works (analytics is skipped)
  */
+const User_model_js_1 = require("../models/User.model.js");
+const env_js_1 = require("../config/env.js");
 const redirectUrl = async (req, res) => {
     try {
         const shortId = req.params.shortId;
@@ -33,12 +35,93 @@ const redirectUrl = async (req, res) => {
             return;
         }
         // ── Step 1: Resolve URL (cache-aside with MongoDB fallback) ──────
-        const longUrl = await (0, url_service_js_1.getLongUrl)(shortId);
-        if (!longUrl) {
+        const resolved = await (0, url_service_js_1.getLongUrl)(shortId);
+        if (!resolved) {
             res.status(404).json({ error: "URL not found" });
             return;
         }
-        // ── Step 2: Redirect FIRST — ultra-low latency ─────
+        const { longUrl, userId } = resolved;
+        // ── Step 2: Check Plan Limits & Redirect Quota ────────────────────
+        if (userId) {
+            const owner = await User_model_js_1.UserModel.findById(userId);
+            if (owner) {
+                const limit = owner.plan === "PRO" ? env_js_1.env.PRO_MAX_REDIRECTS : env_js_1.env.FREE_MAX_REDIRECTS;
+                const now = new Date();
+                // Dynamic monthly quota reset check
+                if (!owner.redirectQuotaResetDate || now >= owner.redirectQuotaResetDate) {
+                    owner.monthlyRedirectCount = 0;
+                    owner.redirectQuotaResetDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+                    await owner.save();
+                }
+                if (owner.monthlyRedirectCount >= limit) {
+                    res.status(403).send(`
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <title>Redirect Limit Exceeded | DUS</title>
+                            <style>
+                                body {
+                                    font-family: system-ui, -apple-system, sans-serif;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;
+                                    height: 100vh;
+                                    margin: 0;
+                                    background: #0f172a;
+                                    color: #f8fafc;
+                                }
+                                .container {
+                                    text-align: center;
+                                    padding: 2.5rem;
+                                    border-radius: 1rem;
+                                    background: #1e293b;
+                                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+                                    max-width: 450px;
+                                    border: 1px solid #334155;
+                                }
+                                h1 {
+                                    font-size: 1.75rem;
+                                    margin-bottom: 1rem;
+                                    color: #f43f5e;
+                                }
+                                p {
+                                    color: #94a3b8;
+                                    margin-bottom: 1.75rem;
+                                    line-height: 1.6;
+                                }
+                                .btn {
+                                    display: inline-block;
+                                    background: #2563eb;
+                                    color: #ffffff;
+                                    text-decoration: none;
+                                    padding: 0.75rem 1.5rem;
+                                    border-radius: 0.375rem;
+                                    font-weight: 600;
+                                    transition: background 0.2s;
+                                }
+                                .btn:hover {
+                                    background: #1d4ed8;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="container">
+                                <h1>Link Quota Exceeded</h1>
+                                <p>The owner of this link has exceeded their monthly redirect limit. If you are the owner, please log in and upgrade your plan to restore redirect traffic.</p>
+                                <a href="${env_js_1.env.FRONTEND_URL}/dashboard" class="btn">Go to Dashboard</a>
+                            </div>
+                        </body>
+                        </html>
+                    `);
+                    return;
+                }
+                // Increment monthly redirect count for user
+                await User_model_js_1.UserModel.updateOne({ _id: owner._id }, { $inc: { monthlyRedirectCount: 1 } });
+            }
+        }
+        // ── Step 3: Redirect FIRST — ultra-low latency ─────
         let redirectTarget = longUrl;
         if (!/^https?:\/\//i.test(redirectTarget)) {
             redirectTarget = `https://${redirectTarget}`;

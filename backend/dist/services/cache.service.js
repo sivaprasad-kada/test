@@ -34,15 +34,25 @@ function urlKey(shortId) {
  * Returns null on cache miss OR if Redis is unavailable.
  */
 async function getCachedUrl(shortId) {
-    return (0, redis_js_1.safeRedisOp)(() => (0, redis_js_1.getRedisClient)().get(urlKey(shortId)), null, "Cache");
+    const cached = await (0, redis_js_1.safeRedisOp)(() => (0, redis_js_1.getRedisClient)().get(urlKey(shortId)), null, "Cache");
+    if (!cached)
+        return null;
+    try {
+        return JSON.parse(cached);
+    }
+    catch {
+        // Fallback for backward compatibility if old cache entry was just a raw string
+        return { longUrl: cached };
+    }
 }
 /**
  * Cache a URL mapping with TTL.
  * Called after a MongoDB lookup on cache miss.
  * Silently fails if Redis is unavailable.
  */
-async function setCachedUrl(shortId, longUrl) {
-    await (0, redis_js_1.safeRedisOp)(async () => { await (0, redis_js_1.getRedisClient)().set(urlKey(shortId), longUrl, { EX: CACHE_TTL }); }, undefined, "Cache");
+async function setCachedUrl(shortId, value) {
+    const stringified = typeof value === "string" ? JSON.stringify({ longUrl: value }) : JSON.stringify(value);
+    await (0, redis_js_1.safeRedisOp)(async () => { await (0, redis_js_1.getRedisClient)().set(urlKey(shortId), stringified, { EX: CACHE_TTL }); }, undefined, "Cache");
 }
 /**
  * Invalidate a cached URL.

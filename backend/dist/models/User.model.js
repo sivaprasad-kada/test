@@ -42,6 +42,13 @@ const userSchema = new mongoose_1.Schema({
     provider: { type: String, enum: ["local", "google", "github"], default: "local" },
     providerId: { type: String },
     avatar: { type: String },
+    plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },
+    subscriptionStatus: { type: String },
+    subscriptionId: { type: String, index: true },
+    subscriptionStartDate: { type: Date },
+    subscriptionEndDate: { type: Date },
+    monthlyRedirectCount: { type: Number, default: 0 },
+    redirectQuotaResetDate: { type: Date, default: () => new Date() },
 }, { timestamps: true });
 exports.UserModel = mongoose_1.default.model("User", userSchema);
 //# sourceMappingURL=User.model.js.map

@@ -1,17 +1,31 @@
   import { createContext, useContext, useState, useEffect, ReactNode } from "react";
   import api from "../api/axios";
 
-  interface User {
+  export interface User {
     id: string;
-    _id?: string; // optional property
+    _id?: string;
     name: string;
     email: string;
-    avatar?: string; // this is also a optional property
+    avatar?: string;
     provider?: string;
+    plan?: "FREE" | "PRO";
+    subscriptionStatus?: string;
+    subscriptionId?: string;
+    subscriptionStartDate?: string;
+    subscriptionEndDate?: string;
+    monthlyRedirectCount?: number;
+    redirectQuotaResetDate?: string;
+  }
+
+  export interface UserLimits {
+    maxLinks: number;
+    maxRedirects: number;
+    linkCount: number;
   }
 
   interface AuthContextType {
     user: User | null;
+    limits: UserLimits | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
@@ -23,15 +37,19 @@
 
   export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [limits, setLimits] = useState<UserLimits | null>(null);
     const [loading, setLoading] = useState(true);
 
     const refreshUser = async () => {
       try {
         const res = await api.get("/auth/me");
         const u = res.data.user;
+        const lim = res.data.limits;
         setUser({ id: u._id || u.id, ...u });
+        setLimits(lim);
       } catch {
         setUser(null);
+        setLimits(null);
       }
     };
 
@@ -41,6 +59,7 @@
         (error) => {
           if (error.response?.status === 401) {
             setUser(null);
+            setLimits(null);
           }
           return Promise.reject(error);
         }
@@ -57,15 +76,13 @@
     }, []);
 
     const login = async (email: string, password: string) => {
-      const res = await api.post("/auth/login", { email, password });
-      const u = res.data.user;
-      setUser({ id: u._id || u.id, ...u });
+      await api.post("/auth/login", { email, password });
+      await refreshUser();
     };
 
     const register = async (name: string, email: string, password: string) => {
-      const res = await api.post("/auth/register", { name, email, password });
-      const u = res.data.user;
-      setUser({ id: u._id || u.id, ...u });
+      await api.post("/auth/register", { name, email, password });
+      await refreshUser();
     };
 
     const logout = async () => {
@@ -75,11 +92,12 @@
         // ignore
       } finally {
         setUser(null);
+        setLimits(null);
       }
     };
 
     return (
-      <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+      <AuthContext.Provider value={{ user, limits, loading, login, register, logout, refreshUser }}>
         {children}
       </AuthContext.Provider>
     );

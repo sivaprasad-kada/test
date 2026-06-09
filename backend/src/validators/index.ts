@@ -28,6 +28,13 @@ export const createUrlSchema = z.object({
             },
             { message: "Invalid URL format" }
         ),
+    customAlias: z
+        .string()
+        .min(3, "Alias must be at least 3 characters")
+        .max(30, "Alias must be at most 30 characters")
+        .regex(/^[a-zA-Z0-9_-]+$/, "Alias must contain only alphanumeric characters, hyphens or underscores")
+        .optional()
+        .or(z.literal("")),
 });
 
 export const loginSchema = z.object({

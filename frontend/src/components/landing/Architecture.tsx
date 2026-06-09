@@ -5,8 +5,8 @@ const steps = [
   { name: "User", subtitle: "REQUEST", icon: User, color: "bg-secondary text-foreground" },
   { name: "Load Balancer", subtitle: "NGINX / ROUTE 53", icon: Network, color: "bg-primary/10 text-primary" },
   { name: "Node.js API Cluster", subtitle: "LOGIC", icon: Server, color: "bg-secondary text-foreground" },
-  { name: "Redis Cache", subtitle: "CHECK FIRST", icon: Zap, color: "bg-red-50 text-red-600" },
-  { name: "MongoDB", subtitle: "PERSISTENT STORAGE", icon: Database, color: "bg-green-50 text-green-700" },
+  { name: "Redis Cache", subtitle: "CHECK FIRST", icon: Zap, color: "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400" },
+  { name: "MongoDB", subtitle: "PERSISTENT STORAGE", icon: Database, color: "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400" },
 ];
 
 const Architecture = () => {

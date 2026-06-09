@@ -22,8 +22,8 @@ const analytics_service_js_1 = require("./analytics.service.js");
  * Create a new short URL mapping.
  * Returns the generated short code.
  */
-async function createShortUrl(longUrl, userId) {
-    const shortId = await (0, generateShortCode_js_1.generateShortCode)();
+async function createShortUrl(longUrl, userId, customAlias) {
+    const shortId = customAlias ? customAlias.trim().toLowerCase() : await (0, generateShortCode_js_1.generateShortCode)();
     await Url_model_js_1.UrlModel.create({
         shortId,
         longUrl,
@@ -47,17 +47,21 @@ async function createShortUrl(longUrl, userId) {
 async function getLongUrl(shortId) {
     // Step 1: Check cache (returns null if Redis is down — graceful fallback)
     const cached = await (0, cache_service_js_1.getCachedUrl)(shortId);
-    if (cached) {
+    if (cached && cached.longUrl) {
         return cached;
     }
     // Step 2: Cache miss (or Redis down) — query MongoDB
-    const urlDoc = await Url_model_js_1.UrlModel.findOne({ shortId }).select("longUrl").lean();
+    const urlDoc = await Url_model_js_1.UrlModel.findOne({ shortId }).select("longUrl userId").lean();
     if (!urlDoc || !urlDoc.longUrl) {
         return null;
     }
+    const result = {
+        longUrl: urlDoc.longUrl,
+        userId: urlDoc.userId ? urlDoc.userId.toString() : undefined,
+    };
     // Step 3: Populate cache for future requests (no-op if Redis is down)
-    await (0, cache_service_js_1.setCachedUrl)(shortId, urlDoc.longUrl);
-    return urlDoc.longUrl;
+    await (0, cache_service_js_1.setCachedUrl)(shortId, result);
+    return result;
 }
 // ─── Get User URLs ───────────────────────────────────
 async function getUserUrls(userId) {

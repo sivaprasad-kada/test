@@ -64,21 +64,18 @@ const FloatingCards = () => {
           }}
         >
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-blue-100/60 shadow-lg"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-blue-100/60 dark:border-blue-900/30 shadow-lg bg-white/70 dark:bg-slate-900/70 backdrop-blur-md"
             style={{
-              background: "rgba(255,255,255,0.72)",
-              backdropFilter: "blur(14px)",
-              WebkitBackdropFilter: "blur(14px)",
               boxShadow:
                 "0 4px 24px rgba(37,99,235,0.08), 0 1px 4px rgba(0,0,0,0.06)",
             }}
           >
             <span className="text-base leading-none">{card.icon}</span>
             <div>
-              <p className="text-[10px] font-medium text-slate-400 leading-none mb-0.5">
+              <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 leading-none mb-0.5">
                 {card.label}
               </p>
-              <p className="text-sm font-bold text-slate-800 leading-none">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-none">
                 {card.value}
               </p>
             </div>

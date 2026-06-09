@@ -9,7 +9,12 @@ const helmet_1 = __importDefault(require("helmet"));
 const url_routes_js_1 = __importDefault(require("./routes/url.routes.js"));
 const redirect_routes_js_1 = __importDefault(require("./routes/redirect.routes.js"));
 const auth_routes_js_1 = __importDefault(require("./routes/auth.routes.js"));
+const alias_routes_js_1 = __importDefault(require("./routes/alias.routes.js"));
+const links_routes_js_1 = __importDefault(require("./routes/links.routes.js"));
+const billing_routes_js_1 = __importDefault(require("./routes/billing.routes.js"));
+const webhook_routes_js_1 = __importDefault(require("./routes/webhook.routes.js"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
+const env_js_1 = require("./config/env.js");
 /**
  * Express Application
  * ───────────────────
@@ -28,10 +33,12 @@ app.use((0, helmet_1.default)({
     contentSecurityPolicy: false, // Disabled for development flexibility
 }));
 // ─── Middleware ───────────────────────────────────────
-// Trust proxy headers (x-forwarded-for) for correct IP extraction
-app.set("trust proxy", true);
+// Trust proxy headers (x-forwarded-for) for correct IP extraction in production
+if (env_js_1.env.isProduction) {
+    app.set("trust proxy", true);
+}
 // CORS — allow frontend to send cookies cross-origin
-const rawFrontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+const rawFrontendUrl = env_js_1.env.FRONTEND_URL;
 const sanitizedFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
 const allowedOrigins = [
     rawFrontendUrl,
@@ -46,7 +53,7 @@ app.use((0, cors_1.default)({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin)
             return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== "production") {
+        if (allowedOrigins.indexOf(origin) !== -1 || !env_js_1.env.isProduction) {
             callback(null, true);
         }
         else {
@@ -55,7 +62,11 @@ app.use((0, cors_1.default)({
     },
     credentials: true,
 }));
-app.use(express_1.default.json());
+app.use(express_1.default.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf.toString();
+    }
+}));
 app.use((0, cookie_parser_1.default)());
 // ─── Health Check ────────────────────────────────────
 app.get("/health", (_req, res) => {
@@ -64,6 +75,10 @@ app.get("/health", (_req, res) => {
 // ─── API Routes ──────────────────────────────────────
 app.use("/api/auth", auth_routes_js_1.default);
 app.use("/api/url", url_routes_js_1.default);
+app.use("/api/alias", alias_routes_js_1.default);
+app.use("/api/links", links_routes_js_1.default);
+app.use("/api/billing", billing_routes_js_1.default);
+app.use("/api/webhooks", webhook_routes_js_1.default);
 // ─── Redirect Route (MUST be last) ──────────────────
 app.use("/", redirect_routes_js_1.default);
 exports.default = app;

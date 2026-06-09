@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
+require("./config/env.js");
 const app_js_1 = __importDefault(require("./app.js"));
 const mongo_js_1 = require("./config/mongo.js");
 const redis_js_1 = require("./config/redis.js");

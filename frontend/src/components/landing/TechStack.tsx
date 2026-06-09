@@ -2,10 +2,10 @@ import { motion } from "framer-motion";
 import { Server, Code2, Database, Zap } from "lucide-react";
 
 const techs = [
-  { name: "Node.js", icon: Server, description: "Event-driven runtime for high-concurrency API performance.", color: "text-green-600 bg-green-50" },
-  { name: "React", icon: Code2, description: "Dynamic dashboard for real-time engagement monitoring.", color: "text-blue-600 bg-blue-50" },
-  { name: "Redis", icon: Zap, description: "Sub-millisecond latency link resolution via memory cache.", color: "text-red-600 bg-red-50" },
-  { name: "MongoDB", icon: Database, description: "Flexible document storage for petabyte-scale link metadata.", color: "text-green-700 bg-green-50" },
+  { name: "Node.js", icon: Server, description: "Event-driven runtime for high-concurrency API performance.", color: "text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/30" },
+  { name: "React", icon: Code2, description: "Dynamic dashboard for real-time engagement monitoring.", color: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/30" },
+  { name: "Redis", icon: Zap, description: "Sub-millisecond latency link resolution via memory cache.", color: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30" },
+  { name: "MongoDB", icon: Database, description: "Flexible document storage for petabyte-scale link metadata.", color: "text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-950/30" },
 ];
 
 const TechStack = () => {

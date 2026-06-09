@@ -17,8 +17,8 @@ import { getLiveClickCount, getUniqueVisitors, getTodayDate } from "./analytics.
  * Create a new short URL mapping.
  * Returns the generated short code.
  */
-export async function createShortUrl(longUrl: string, userId: string): Promise<string> {
-  const shortId = await generateShortCode();
+export async function createShortUrl(longUrl: string, userId: string, customAlias?: string): Promise<string> {
+  const shortId = customAlias ? customAlias.trim().toLowerCase() : await generateShortCode();
 
   await UrlModel.create({
     shortId,
@@ -44,24 +44,29 @@ export async function createShortUrl(longUrl: string, userId: string): Promise<s
  * NOTE: We intentionally do NOT increment clicks here.
  * Click counting happens asynchronously via the analytics worker.
  */
-export async function getLongUrl(shortId: string): Promise<string | null> {
+export async function getLongUrl(shortId: string): Promise<{ longUrl: string; userId?: string } | null> {
   // Step 1: Check cache (returns null if Redis is down — graceful fallback)
   const cached = await getCachedUrl(shortId);
-  if (cached) {
+  if (cached && cached.longUrl) {
     return cached;
   }
 
   // Step 2: Cache miss (or Redis down) — query MongoDB
-  const urlDoc = await UrlModel.findOne({ shortId }).select("longUrl").lean();
+  const urlDoc = await UrlModel.findOne({ shortId }).select("longUrl userId").lean();
 
   if (!urlDoc || !urlDoc.longUrl) {
     return null;
   }
 
-  // Step 3: Populate cache for future requests (no-op if Redis is down)
-  await setCachedUrl(shortId, urlDoc.longUrl);
+  const result = {
+    longUrl: urlDoc.longUrl,
+    userId: urlDoc.userId ? urlDoc.userId.toString() : undefined,
+  };
 
-  return urlDoc.longUrl;
+  // Step 3: Populate cache for future requests (no-op if Redis is down)
+  await setCachedUrl(shortId, result);
+
+  return result;
 }
 
 // ─── Get User URLs ───────────────────────────────────

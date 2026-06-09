@@ -34,12 +34,19 @@ function urlKey(shortId: string): string {
  * Get a cached long URL by shortId.
  * Returns null on cache miss OR if Redis is unavailable.
  */
-export async function getCachedUrl(shortId: string): Promise<string | null> {
-    return safeRedisOp(
+export async function getCachedUrl(shortId: string): Promise<any | null> {
+    const cached = await safeRedisOp(
         () => getRedisClient().get(urlKey(shortId)),
         null,
         "Cache"
     );
+    if (!cached) return null;
+    try {
+        return JSON.parse(cached);
+    } catch {
+        // Fallback for backward compatibility if old cache entry was just a raw string
+        return { longUrl: cached };
+    }
 }
 
 /**
@@ -47,9 +54,10 @@ export async function getCachedUrl(shortId: string): Promise<string | null> {
  * Called after a MongoDB lookup on cache miss.
  * Silently fails if Redis is unavailable.
  */
-export async function setCachedUrl(shortId: string, longUrl: string): Promise<void> {
+export async function setCachedUrl(shortId: string, value: any): Promise<void> {
+    const stringified = typeof value === "string" ? JSON.stringify({ longUrl: value }) : JSON.stringify(value);
     await safeRedisOp(
-        async () => { await getRedisClient().set(urlKey(shortId), longUrl, { EX: CACHE_TTL }); },
+        async () => { await getRedisClient().set(urlKey(shortId), stringified, { EX: CACHE_TTL }); },
         undefined,
         "Cache"
     );

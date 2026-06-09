@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MousePointerClick, Users, Globe, Loader2, ArrowLeft, Monitor, Smartphone, RefreshCw } from "lucide-react";
+import { MousePointerClick, Users, Globe, Loader2, ArrowLeft, Monitor, Smartphone, RefreshCw, Lock } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import api from "@/api/axios";
+import { useAuth } from "@/context/AuthContext";
 
 interface AnalyticsEntry {
   _id: string;
@@ -29,7 +30,9 @@ const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 const AnalyticsPage = () => {
   const { shortId } = useParams<{ shortId: string }>();
   const navigate = useNavigate();
-
+  const { user } = useAuth();
+  const isPro = user?.plan === "PRO";
+ 
   const [analytics, setAnalytics] = useState<AnalyticsEntry[]>([]);
   const [urlInfo, setUrlInfo] = useState<UrlItem | null>(null);
   const [urls, setUrls] = useState<UrlItem[]>([]);
@@ -239,19 +242,19 @@ const AnalyticsPage = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[
-                { label: "Total Clicks", value: totalClicks.toLocaleString(), icon: MousePointerClick },
-                { label: "Unique Visitors", value: totalUnique.toLocaleString(), icon: Users },
-                { label: "Top Country", value: countryData[0]?.name || "N/A", icon: Globe },
-                { label: "Top Device", value: deviceData[0]?.name || "N/A", icon: Monitor },
+                { label: "Total Clicks", value: totalClicks.toLocaleString(), icon: MousePointerClick, locked: false },
+                { label: "Unique Visitors", value: totalUnique.toLocaleString(), icon: Users, locked: false },
+                { label: "Top Country", value: isPro ? (countryData[0]?.name || "N/A") : "PRO Only", icon: Globe, locked: !isPro },
+                { label: "Top Device", value: isPro ? (deviceData[0]?.name || "N/A") : "PRO Only", icon: Monitor, locked: !isPro },
               ].map((stat) => (
-                <div key={stat.label} className="bg-card rounded-xl border border-border shadow-card p-5">
+                <div key={stat.label} className="bg-card rounded-xl border border-border shadow-card p-5 relative overflow-hidden">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs text-muted-foreground">{stat.label}</p>
                     <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                      <stat.icon size={16} />
+                      {stat.locked ? <Lock size={14} className="text-amber-500" /> : <stat.icon size={16} />}
                     </div>
                   </div>
-                  <p className="text-2xl font-black text-foreground">{stat.value}</p>
+                  <p className={`text-2xl font-black ${stat.locked ? "text-amber-500" : "text-foreground"}`}>{stat.value}</p>
                 </div>
               ))}
             </div>
@@ -282,55 +285,72 @@ const AnalyticsPage = () => {
 
             {/* Bottom row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Countries */}
-              {countryData.length > 0 && (
-                <div className="bg-card rounded-xl border border-border shadow-card p-6">
-                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                    <Globe size={18} /> Countries
-                  </h3>
-                  <div className="space-y-3">
-                    {countryData.map((c) => (
-                      <div key={c.name} className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">{c.name}</span>
-                        <span className="text-sm font-bold text-foreground">{c.clicks}</span>
-                      </div>
-                    ))}
+              {!isPro ? (
+                <div className="md:col-span-3 bg-card rounded-xl border border-border shadow-card p-8 text-center flex flex-col items-center justify-center min-h-[280px]">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                    <Lock className="text-amber-500 animate-pulse" size={24} />
                   </div>
+                  <h3 className="text-lg font-black text-foreground mb-2">Detailed Analytics Locked</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mb-6">
+                    Unlock detailed click breakdowns including Country origin, User Browsers, and Device types with a PRO subscription.
+                  </p>
+                  <Button onClick={() => navigate("/dashboard/billing")} className="shadow-md">
+                    Upgrade to Pro (₹299/mo)
+                  </Button>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* Countries */}
+                  {countryData.length > 0 && (
+                    <div className="bg-card rounded-xl border border-border shadow-card p-6">
+                      <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                        <Globe size={18} /> Countries
+                      </h3>
+                      <div className="space-y-3">
+                        {countryData.map((c) => (
+                          <div key={c.name} className="flex items-center justify-between">
+                            <span className="text-sm text-foreground">{c.name}</span>
+                            <span className="text-sm font-bold text-foreground">{c.clicks}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Browsers */}
-              {browserData.length > 0 && (
-                <div className="bg-card rounded-xl border border-border shadow-card p-6">
-                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                    <Monitor size={18} /> Browsers
-                  </h3>
-                  <div className="space-y-3">
-                    {browserData.map((b) => (
-                      <div key={b.name} className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">{b.name}</span>
-                        <span className="text-sm font-bold text-foreground">{b.clicks}</span>
+                  {/* Browsers */}
+                  {browserData.length > 0 && (
+                    <div className="bg-card rounded-xl border border-border shadow-card p-6">
+                      <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                        <Monitor size={18} /> Browsers
+                      </h3>
+                      <div className="space-y-3">
+                        {browserData.map((b) => (
+                          <div key={b.name} className="flex items-center justify-between">
+                            <span className="text-sm text-foreground">{b.name}</span>
+                            <span className="text-sm font-bold text-foreground">{b.clicks}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  )}
 
-              {/* Devices */}
-              {deviceData.length > 0 && (
-                <div className="bg-card rounded-xl border border-border shadow-card p-6">
-                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                    <Smartphone size={18} /> Devices
-                  </h3>
-                  <div className="space-y-3">
-                    {deviceData.map((d) => (
-                      <div key={d.name} className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">{d.name}</span>
-                        <span className="text-sm font-bold text-foreground">{d.clicks}</span>
+                  {/* Devices */}
+                  {deviceData.length > 0 && (
+                    <div className="bg-card rounded-xl border border-border shadow-card p-6">
+                      <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                        <Smartphone size={18} /> Devices
+                      </h3>
+                      <div className="space-y-3">
+                        {deviceData.map((d) => (
+                          <div key={d.name} className="flex items-center justify-between">
+                            <span className="text-sm text-foreground">{d.name}</span>
+                            <span className="text-sm font-bold text-foreground">{d.clicks}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </>

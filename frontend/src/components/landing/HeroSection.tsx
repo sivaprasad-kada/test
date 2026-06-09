@@ -79,7 +79,7 @@ const HeroSection = () => {
               variants={fadeUp}
               initial="hidden"
               animate="visible"
-              className="text-5xl sm:text-6xl lg:text-[3.8rem] xl:text-[4.2rem] font-black tracking-tight leading-[1.05] mb-5 text-slate-900"
+              className="text-5xl sm:text-6xl lg:text-[3.8rem] xl:text-[4.2rem] font-black tracking-tight leading-[1.05] mb-5 text-slate-900 dark:text-white"
             >
               Shorten,{" "}
               <span
@@ -112,7 +112,7 @@ const HeroSection = () => {
               variants={fadeUp}
               initial="hidden"
               animate="visible"
-              className="text-base sm:text-lg leading-relaxed mb-8 max-w-lg text-slate-500"
+              className="text-base sm:text-lg leading-relaxed mb-8 max-w-lg text-slate-500 dark:text-slate-400"
             >
               Create branded short links, monitor analytics in real-time, generate QR codes, and manage redirects globally.
             </motion.p>
@@ -127,13 +127,13 @@ const HeroSection = () => {
             >
               {/* Input row */}
               <div
-                className="flex items-center gap-2 p-1.5 rounded-2xl w-full bg-white border border-blue-500/15"
+                className="flex items-center gap-2 p-1.5 rounded-2xl w-full bg-white dark:bg-slate-950 border border-blue-500/15 dark:border-slate-800"
                 style={{
                   boxShadow: "0 2px 20px rgba(37,99,235,0.07), 0 1px 3px rgba(0,0,0,0.05)",
                 }}
               >
                 <div className="flex items-center gap-2.5 flex-1 pl-4">
-                  <Link2 size={17} className="text-slate-400 shrink-0" />
+                  <Link2 size={17} className="text-slate-400 dark:text-slate-500 shrink-0" />
                   <input
                     ref={inputRef}
                     type="url"
@@ -141,7 +141,7 @@ const HeroSection = () => {
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleShorten()}
-                    className="flex-1 bg-transparent outline-none text-sm text-slate-900"
+                    className="flex-1 bg-transparent outline-none text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <button
@@ -219,14 +219,6 @@ const HeroSection = () => {
           )}
         </div>
       </div>
-
-      {/* Bottom fade */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-        style={{
-          background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.95))",
-        }}
-      />
     </section>
   );
 };

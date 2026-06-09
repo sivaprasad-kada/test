@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Link2, LayoutGrid, LinkIcon, BarChart3, Settings, LogOut, Menu, ChevronLeft, ChevronRight, Sun, Moon } from "lucide-react";
+import { Link2, LayoutGrid, LinkIcon, BarChart3, Settings, LogOut, Menu, ChevronLeft, ChevronRight, Sun, Moon, CreditCard } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-
+ 
 const navItems = [
   { name: "Overview", icon: LayoutGrid, path: "/dashboard" },
   { name: "My Links", icon: LinkIcon, path: "/shortener" },
   { name: "Analytics", icon: BarChart3, path: "/analytics" },
+  { name: "Billing", icon: CreditCard, path: "/dashboard/billing" },
   { name: "Settings", icon: Settings, path: "/settings" },
 ];
 
