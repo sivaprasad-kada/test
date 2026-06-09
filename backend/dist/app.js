@@ -38,12 +38,13 @@ if (env_js_1.env.isProduction) {
     app.set("trust proxy", true);
 }
 // CORS — allow frontend to send cookies cross-origin
-const rawFrontendUrl = env_js_1.env.FRONTEND_URL;
+const rawFrontendUrl = env_js_1.env.FRONTEND_URL || "https://shortly.sivaprasadkada.tech";
 const sanitizedFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
 const allowedOrigins = [
     rawFrontendUrl,
     sanitizedFrontendUrl,
     "https://shortly.sivaprasadkada.tech",
+    "https://api.shortly.sivaprasadkada.tech",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
     "http://localhost:5173",
@@ -53,7 +54,11 @@ app.use((0, cors_1.default)({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin)
             return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || !env_js_1.env.isProduction) {
+        const isAllowed = allowedOrigins.indexOf(origin) !== -1 ||
+            origin.endsWith(".sivaprasadkada.tech") ||
+            origin === "https://sivaprasadkada.tech" ||
+            !env_js_1.env.isProduction;
+        if (isAllowed) {
             callback(null, true);
         }
         else {

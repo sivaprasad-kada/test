@@ -40,13 +40,14 @@ if (env.isProduction) {
 }
 
 // CORS — allow frontend to send cookies cross-origin
-const rawFrontendUrl = env.FRONTEND_URL;
+const rawFrontendUrl = env.FRONTEND_URL || "https://shortly.sivaprasadkada.tech";
 const sanitizedFrontendUrl = rawFrontendUrl.replace(/\/$/, "");
 
 const allowedOrigins = [
   rawFrontendUrl,
   sanitizedFrontendUrl,
   "https://shortly.sivaprasadkada.tech",
+  "https://api.shortly.sivaprasadkada.tech",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   "http://localhost:5173",
@@ -56,7 +57,14 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || !env.isProduction) {
+
+    const isAllowed = 
+      allowedOrigins.indexOf(origin) !== -1 ||
+      origin.endsWith(".sivaprasadkada.tech") ||
+      origin === "https://sivaprasadkada.tech" ||
+      !env.isProduction;
+
+    if (isAllowed) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
