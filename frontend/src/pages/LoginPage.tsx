@@ -102,7 +102,7 @@ const LoginPage = () => {
 
       <div className="w-full max-w-md mx-auto px-6 py-16">
         {isLogin ? (
-          <div className="bg-card rounded-2xl border border-border shadow-card p-10 animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-card rounded-2xl border border-border shadow-card p-6 sm:p-10 animate-in fade-in zoom-in-95 duration-300">
             <h2 className="text-3xl font-black text-foreground mb-2">Welcome Back</h2>
             <p className="text-muted-foreground mb-8">Continue your journey with Shortly.</p>
 
@@ -168,7 +168,7 @@ const LoginPage = () => {
             </div>
           </div>
         ) : (
-          <div className="bg-card rounded-2xl border border-border shadow-card p-10 animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-card rounded-2xl border border-border shadow-card p-6 sm:p-10 animate-in fade-in zoom-in-95 duration-300">
             <h2 className="text-3xl font-black text-foreground mb-2">Join Shortly Today</h2>
             <p className="text-muted-foreground mb-8">Create an account to start shortening links. Free forever.</p>
 

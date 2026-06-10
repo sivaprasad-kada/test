@@ -98,13 +98,13 @@ const DashboardPage = () => {
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-background">
       <DashboardSidebar />
-      <main className="flex-1 p-6 md:p-10 overflow-auto">
-        <div className="flex items-center justify-between mb-8">
+      <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-black text-foreground">Welcome back, {firstName}.</h1>
             <p className="text-muted-foreground mt-1">Here's what's happening with your links today.</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
             <Button 
               variant="ghost" 
               size="sm" 
@@ -114,7 +114,7 @@ const DashboardPage = () => {
             >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
             </Button>
-            <Button onClick={() => navigate("/shortener")}>+ Create New Link</Button>
+            <Button onClick={() => navigate("/shortener")} className="whitespace-nowrap">+ Create New Link</Button>
           </div>
         </div>
 
@@ -161,7 +161,7 @@ const DashboardPage = () => {
         )}
 
         {/* URLs Table */}
-        <div className="bg-card rounded-xl border border-border shadow-card p-6">
+        <div className="bg-card rounded-xl border border-border shadow-card p-4 sm:p-6">
           <h3 className="text-lg font-bold text-foreground mb-4">Your Links</h3>
 
           {loading ? (
@@ -178,7 +178,7 @@ const DashboardPage = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[600px] text-sm">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Short Link</th>

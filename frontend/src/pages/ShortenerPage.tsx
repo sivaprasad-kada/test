@@ -201,7 +201,7 @@ const ShortenerPage = () => {
     <div className="flex flex-col lg:flex-row min-h-screen bg-background">
       <DashboardSidebar />
 
-      <main className="flex-1 p-6 md:p-10 overflow-auto animate-fade-in">
+      <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-auto animate-fade-in">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-black text-foreground mb-3">Shorten your links instantly</h1>
@@ -210,8 +210,8 @@ const ShortenerPage = () => {
 
           {/* Shortener input container */}
           <div className="bg-card rounded-2xl p-4 shadow-card border border-border mb-4">
-            <div className="flex items-center gap-2 bg-secondary/35 rounded-xl p-2 border border-border/50">
-              <div className="flex items-center gap-2 flex-1 pl-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-secondary/35 rounded-xl p-2 border border-border/50">
+              <div className="flex items-center gap-2 flex-1 pl-3 py-1.5 sm:py-0">
                 <Link2 size={18} className="text-muted-foreground shrink-0" />
                 <input
                   type="url"
@@ -219,23 +219,23 @@ const ShortenerPage = () => {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleShorten()}
-                  className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground text-sm"
+                  className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground text-sm min-w-0"
                 />
               </div>
-              <Button size="lg" onClick={handleShorten} disabled={creating} className="shadow-md">
+              <Button size="lg" onClick={handleShorten} disabled={creating} className="shadow-md w-full sm:w-auto">
                 {creating ? <><Loader2 size={16} className="animate-spin mr-2" /> Creating...</> : "Shorten Now"}
               </Button>
             </div>
 
             {/* Custom Alias section */}
             {!isPro ? (
-              <div className="flex items-center justify-between p-3 bg-secondary/15 rounded-xl border border-border/60 mt-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-secondary/15 rounded-xl border border-border/60 mt-3">
                 <div className="flex items-center gap-2">
                   <Lock size={14} className="text-amber-500" />
                   <span className="text-sm font-semibold text-foreground">Custom Suffix Alias</span>
                   <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Pro</span>
                 </div>
-                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
                   Upgrade to Pro to customize aliases.
                   <Button variant="link" size="sm" className="h-auto p-0 font-bold" onClick={() => navigate("/dashboard/billing")}>
                     Upgrade
@@ -258,8 +258,8 @@ const ShortenerPage = () => {
                 </div>
 
                 {useCustomAlias && (
-                  <div className="flex items-center gap-2 bg-secondary/10 border border-border rounded-xl p-2 pl-4 max-w-md animate-in fade-in-30 slide-in-from-top-1">
-                    <span className="text-xs text-muted-foreground select-none">
+                  <div className="flex flex-wrap items-center gap-2 bg-secondary/10 border border-border rounded-xl p-2 pl-4 max-w-md animate-in fade-in-30 slide-in-from-top-1">
+                    <span className="text-xs text-muted-foreground select-none truncate max-w-[180px] sm:max-w-none">
                       {backendBase.replace(/^https?:\/\//, "")}/
                     </span>
                     <input
@@ -267,7 +267,7 @@ const ShortenerPage = () => {
                       placeholder="my-alias"
                       value={customAlias}
                       onChange={(e) => setCustomAlias(e.target.value.replace(/[^a-zA-Z0-9-_]/g, ""))}
-                      className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground text-sm"
+                      className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground text-sm min-w-[80px]"
                     />
                     {checkingAlias && <Loader2 size={16} className="animate-spin text-muted-foreground mr-2" />}
                     {!checkingAlias && customAlias.trim().length > 0 && aliasAvailable !== null && (
@@ -287,19 +287,19 @@ const ShortenerPage = () => {
 
           {/* Result Card */}
           {shortened && (
-            <div className="flex items-center justify-between bg-card rounded-xl p-4 border border-border shadow-card mb-6 animate-in fade-in-0 slide-in-from-top-2">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card rounded-xl p-4 border border-border shadow-card mb-6 animate-in fade-in-0 slide-in-from-top-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
                   <Check size={16} className="text-emerald-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wide">Short Link Created</p>
-                  <a href={shortened.shortUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-foreground hover:text-primary">
+                  <a href={shortened.shortUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-foreground hover:text-primary break-all">
                     {shortened.shortUrl}
                   </a>
                 </div>
               </div>
-              <Button size="sm" className="gap-2" onClick={() => handleCopy(shortened.shortUrl)}>
+              <Button size="sm" className="gap-2 w-full sm:w-auto shrink-0" onClick={() => handleCopy(shortened.shortUrl)}>
                 {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Link</>}
               </Button>
             </div>
@@ -324,7 +324,7 @@ const ShortenerPage = () => {
             ) : (
               <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[600px] text-sm">
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Original Link</th>
